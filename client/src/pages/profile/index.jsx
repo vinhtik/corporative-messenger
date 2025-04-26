@@ -110,7 +110,7 @@ const handleDeleteImage = async () => {
           <div className="h-full w-32 md:w-48 md:h-48 relative flex items-center justify-center"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}>
-            <Avatar className="absolute h-32 w-32 md:w-48 md:h-48 rounded-full overflow-hidden">
+            <Avatar className="h-32 w-32 md:w-48 md:h-48 rounded-full overflow-hidden">
               {
                 image ? (<AvatarImage src={image} alt="profile" 
                 className="object-cover w-full h-full bg-black" />
