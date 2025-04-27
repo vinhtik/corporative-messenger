@@ -1,4 +1,3 @@
-import Background from "@/assets/login.jpg"
 import Welcome from "@/assets/logo.svg"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -75,7 +74,7 @@ const Auth = () => {
         <div className="relative rounded-2xl h-[80vh] bg-white border-2 border-white text-opacity-90 shadow-2xl w-[80vw] xl:w-[50vw]">
 
         <div className="absolute inset-0 rounded-2xl
-           bg-[url(@/assets/login.jpg)] bg-no-repeat 
+           bg-[url(@/assets/login2.jpg)] bg-no-repeat 
              bg-cover opacity-0 z-0 animate-[pulse_10s_ease-in-out_infinite]">
         </div>
             
