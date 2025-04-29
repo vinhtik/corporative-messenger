@@ -9,10 +9,21 @@ import { IoCloseSharp } from "react-icons/io5";
 
 const MessageContainer = () => {
   const scrollRef = useRef();
-  const { selectedChatType, selectedChatData, userInfo, selectedChatMessages, setSelectedChatMessages } = useAppStore();
+  const { selectedChatType,
+    selectedChatData,
+    userInfo,
+    isDownloading,
+    isUploading,
+    selectedChatMessages,
+    setSelectedChatMessages,
+    fileUploadProgress,
+    fileDownloadProgress,
+    setIsDownloading,
+    setFileDownloadProgress,
+   } = useAppStore();
   const [showImage, setShowImage] = useState(false);
   const [imageURL, setImageURL] = useState(null);
-
+  const [downloadingFile, setDownloadingFile] = useState(null);
   useEffect(() => {
 
     const getMessages = async () => {
@@ -72,8 +83,16 @@ const MessageContainer = () => {
   }
 
   const downloadFile = async (url) => {
+    setDownloadingFile(url);
+    setFileDownloadProgress(0);
     const response = await apiClient.get(`${HOST}/${url}`, 
-      { responseType: "blob" }
+      { responseType: "blob",
+        onDownloadProgress: (progressEvent) => {
+          const {loaded, total} = progressEvent;
+          const percentCompleted = Math.round((loaded*100) / total);
+          setFileDownloadProgress(percentCompleted);
+        }
+       }
     );
     const urlBlob = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
@@ -83,6 +102,8 @@ const MessageContainer = () => {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(urlBlob);
+    setDownloadingFile(null);
+    setFileDownloadProgress(0);
   };
 
   const renderDMMessages = (message) => (
@@ -100,7 +121,7 @@ const MessageContainer = () => {
         </div>
       )}
       {
-        message.messageType === "file" &&  <div className={`${message.sender !== selectedChatData._id 
+        message.messageType === "file" && <div className={`${message.sender !== selectedChatData._id 
           ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
           : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
           } border inline-block p-2 my-1 max-w-[50%] break-words rounded-t-2xl`}
@@ -112,18 +133,16 @@ const MessageContainer = () => {
               setImageURL(message.fileUrl);
             }}
             >
-              <img src={`${HOST}/${message.fileUrl}`} height={300} width={300}></img>
+              <img src={`${HOST}/${message.fileUrl}`} height={300} width={300} alt="Preview"></img>
             </div>
-            ) : (<div className="flex items-center justify-center gap-4">
-              <span className="text-white/80 text-3xl bg-black/20 rounded-full p-3"
-              >
-                <MdFolderZip />
-              </span>
-              <span>{message.fileUrl.split("/").pop()}</span>
-              <span className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
+            ) : (
+              <div className="flex items-center justify-center gap-4">
+              <span className="pl-2">{message.fileUrl.split("/").pop()}</span>
+              <span className="bg-black/20 p-2 text-xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
               onClick={() => downloadFile(message.fileUrl)}
               >
-                <IoMdArrowRoundDown />
+              {downloadingFile  === message.fileUrl ?  <p className="text-sm animate-pulse">{fileDownloadProgress}%</p>
+              : <IoMdArrowRoundDown />}
               </span>
             </div>
             )}
@@ -147,21 +166,21 @@ const MessageContainer = () => {
               />
             </div>
             <div className="flex gap-5 fixed top-0 right-0 m-5">
-            <buton className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
+            <button className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
               onClick={() => {
                 downloadFile(imageURL)
             }}
               >
-              <IoMdArrowRoundDown />
-              </buton>
-              <buton className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
+                {downloadingFile === imageURL ? <p className="text-xs animate-pulse">{fileDownloadProgress}%</p> : <IoMdArrowRoundDown />}
+              </button>
+              <button className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
               onClick={() => {
                 setShowImage(false);
                 setImageURL(null);
             }}
               >
               <IoCloseSharp />
-              </buton>
+              </button>
             </div>
           </div>
         }
