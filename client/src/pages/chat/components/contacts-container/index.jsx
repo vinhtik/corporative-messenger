@@ -15,14 +15,13 @@ const ContactsContainer = () => {
     const getContacts = async () => {
       const response = await apiClient.get(GET_DM_CONTACTS_ROUTES,
         { withCredentials: true,
-
         });
         if (response.data.contacts) {
           setDirectMessagesContacts(response.data.contacts);
         }
     }
     getContacts();
-  })
+  }, []);
 
   return (
     <div className="relative md:w-[35vw] lg:w-[30vw]

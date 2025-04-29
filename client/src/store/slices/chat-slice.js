@@ -24,8 +24,8 @@ export const createChatSlice = (set, get) => ({
                         ? message.recipient
                         : message.recipient._id,
                     sender: selectedChatType === "channel"
-                        ? message.recipient
-                        : message.recipient._id,
+                        ? message.sender
+                        : message.sender._id,
                 },
             ],
         });

@@ -1,5 +1,6 @@
 import User from "../models/UserModel.js";
 import Message from '../models/MessagesModel.js'
+import {mkdirSync, renameSync} from 'fs'
 
 export const getMessages = async (request, response, next) => {
     try{
@@ -18,6 +19,27 @@ export const getMessages = async (request, response, next) => {
         }).sort({ timestamp: 1 });
 
         return response.status(200).json({ messages });
+    }catch (err){
+        console.log({err});
+        return response.status(500).send("Internal Server Error")
+    }
+};
+
+export const uploadFile = async (request, response, next) => {
+    try{
+       if (!request.file) {
+        return response.status(400).send("File is reqired");
+       }
+       const date = Date.now();
+       let fileDir = `uploads/files/${date}`;
+       const originalName = Buffer.from(request.file.originalname, 'latin1').toString('utf8');
+       const fileName = `${fileDir}/${originalName}`;
+       
+       mkdirSync(fileDir, { recursive: true });
+       
+       renameSync(request.file.path, fileName);
+
+        return response.status(200).json({ filePath: fileName });
     }catch (err){
         console.log({err});
         return response.status(500).send("Internal Server Error")
