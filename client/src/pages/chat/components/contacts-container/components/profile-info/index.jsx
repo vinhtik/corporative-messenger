@@ -74,7 +74,7 @@ const ProfileInfo = () => {
                 />
                 </TooltipTrigger>
                 <TooltipContent className="bg-[#1c1b1e] border-none text-white">
-                   Logout
+                   Выход
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>

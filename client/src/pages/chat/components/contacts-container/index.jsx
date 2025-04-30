@@ -38,7 +38,7 @@ const ContactsContainer = () => {
     <div className="relative md:w-[35vw] lg:w-[30vw]
      xl:w-[20vw] bg-[#1b1c24] border-r-2 border-[#2f303b] w-full">
       <div className="pt-3">
-        <img src={Logo} alt="Logo" className="h-[5rem]" />
+        <img src={Logo} alt="Logo" className="h-[4rem] pl-10" />
       </div>
       <div className='my-5'>
         <div className='flex items-center justify-between pr-10'>

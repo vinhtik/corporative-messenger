@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import { useAppStore } from "@/store";
-import { GET_ALL_MESSAGES_ROUTE, HOST } from "@/utils/constants.js";
+import { GET_ALL_MESSAGES_ROUTE, GET_CHANNEL_MESSAGES, HOST } from "@/utils/constants.js";
 import moment from "moment";
 import { useEffect, useRef, useState } from "react";
 import { MdFolderZip } from "react-icons/md"
@@ -14,20 +14,15 @@ const MessageContainer = () => {
   const { selectedChatType,
     selectedChatData,
     userInfo,
-    isDownloading,
-    isUploading,
     selectedChatMessages,
     setSelectedChatMessages,
-    fileUploadProgress,
     fileDownloadProgress,
-    setIsDownloading,
     setFileDownloadProgress,
    } = useAppStore();
   const [showImage, setShowImage] = useState(false);
   const [imageURL, setImageURL] = useState(null);
   const [downloadingFile, setDownloadingFile] = useState(null);
   useEffect(() => {
-
     const getMessages = async () => {
       try {
         const response = await apiClient.post(GET_ALL_MESSAGES_ROUTE, 
@@ -40,9 +35,22 @@ const MessageContainer = () => {
       } catch (error) {
         console.log({ error })
       }
-    }
+    };
+    const getChannelMessages = async () => {
+      try {
+        const response = await apiClient.get(`${GET_CHANNEL_MESSAGES}/${selectedChatData._id}`, 
+        { withCredentials: true }
+        );
+        if(response.data.messages) {
+          setSelectedChatMessages(response.data.messages)
+        }
+      } catch (error) {
+        console.log({ error })
+      }
+    };
     if (selectedChatData._id) {
       if(selectedChatType === "contact") getMessages();
+      else if (selectedChatType === "channel") getChannelMessages();
     }
   }, [selectedChatData, 
     selectedChatType, 
@@ -146,7 +154,7 @@ const MessageContainer = () => {
               <span className="bg-black/20 p-2 text-xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
               onClick={() => downloadFile(message.fileUrl)}
               >
-              {downloadingFile  === message.fileUrl ?  <p className="text-sm animate-pulse">{fileDownloadProgress}%</p>
+              {downloadingFile  === message.fileUrl ? <p className="text-sm animate-pulse">{fileDownloadProgress}%</p>
               : <IoMdArrowRoundDown />}
               </span>
             </div>
@@ -171,8 +179,34 @@ const MessageContainer = () => {
           {message.content}
         </div>
       )}
-      {
-        message.sender._id !== userInfo.id 
+      {message.messageType === "file" && <div className={`${message.sender._id === userInfo.id 
+          ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
+          : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
+          } border inline-block p-2 my-1 max-w-[50%] break-words rounded-t-2xl`}
+          >
+            {checkIfImage(message.fileUrl)
+            ? (<div className="cursor-pointer"
+            onClick={() => {
+              setShowImage(true);
+              setImageURL(message.fileUrl);
+            }}
+            >
+              <img src={`${HOST}/${message.fileUrl}`} height={300} width={300} alt="Preview"></img>
+            </div>
+            ) : (
+              <div className="flex items-center justify-center gap-4">
+              <span className="pl-2">{message.fileUrl.split("/").pop()}</span>
+              <span className="bg-black/20 p-2 text-xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
+              onClick={() => downloadFile(message.fileUrl)}
+              >
+              {downloadingFile  === message.fileUrl ? <p className="text-sm animate-pulse">{fileDownloadProgress}%</p>
+              : <IoMdArrowRoundDown />}
+              </span>
+            </div>
+            )}
+          </div>
+      }
+      {message.sender._id !== userInfo.id 
         ? (<div className="flex items-center justify-start gap-2">
           <Avatar className="h-8 w-8 rounded-full overflow-hidden">
                   {

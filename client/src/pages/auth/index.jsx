@@ -1,4 +1,4 @@
-import Welcome from "@/assets/logo.svg"
+import Welcome from "@/assets/welcome.svg"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs"
@@ -31,7 +31,7 @@ const Auth = () => {
 
 
     const validateSignup = () => {
-        if(!email.length) {
+        if(!email.length || !password.length) {
             toast.error("Почта обязательна");
             return false;
         }
@@ -71,7 +71,8 @@ const Auth = () => {
 
   return (
     <div className="h-[100vh] w-[100vw] flex items-center justify-center">
-        <div className="relative rounded-2xl h-[80vh] bg-white border-2 border-white text-opacity-90 shadow-2xl w-[80vw] xl:w-[50vw]">
+        <div className="relative rounded-2xl h-[80vh] w-[50vw]
+        max-lg:h-full max-lg:w-full bg-white border-2 border-white text-opacity-90 shadow-2xl xl:w-[50vw] overflow-scroll">
 
         <div className="absolute inset-0 rounded-2xl
            bg-[url(@/assets/login2.jpg)] bg-no-repeat 
@@ -82,7 +83,7 @@ const Auth = () => {
                 <div className="flex items-center justify-center flex-col">
                     <div className="flex items-center justify-center">
                         <h1 className="text-5xl font-bold md:text-6xl">Welcome</h1>
-                        <img src={Welcome} alt="Welcome" className="h-[5rem]" />
+                        <img src={Welcome} alt="Welcome" className="pl-5 h-[5rem]" />
                     </div>
                     <p className="font-medium text-center">авантюрный, творческий корпоративный мессенджер</p>
                 </div>
