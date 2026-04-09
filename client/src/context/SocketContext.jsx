@@ -69,6 +69,64 @@ export const SocketProvider = ({ children }) => {
       addChannelInChannelList(message);
     };
 
+    const handleChannelUpdated = ({ channel }) => {
+      const {
+        selectedChatData,
+        selectedChatType,
+        setSelectedChatData,
+        replaceChannelData,
+      } = useAppStore.getState();
+
+      if (!channel?._id) return;
+
+      replaceChannelData(channel);
+
+      if (
+        selectedChatType === "channel" &&
+        selectedChatData?._id === channel._id
+      ) {
+        setSelectedChatData(channel);
+      }
+    };
+
+    const handleChannelDeleted = ({ channelId }) => {
+      const {
+        selectedChatData,
+        selectedChatType,
+        removeChannel,
+        closeChat,
+      } = useAppStore.getState();
+
+      removeChannel(channelId);
+
+      if (
+        selectedChatType === "channel" &&
+        selectedChatData?._id === channelId
+      ) {
+        closeChat();
+        toast.info("Группа была удалена.");
+      }
+    };
+
+    const handleChannelMemberRemoved = ({ channelId }) => {
+      const {
+        selectedChatData,
+        selectedChatType,
+        removeChannel,
+        closeChat,
+      } = useAppStore.getState();
+
+      removeChannel(channelId);
+
+      if (
+        selectedChatType === "channel" &&
+        selectedChatData?._id === channelId
+      ) {
+        closeChat();
+        toast.info("Вы были удалены из этой группы.");
+      }
+    };
+
     const handleIncomingCall = (callData) => {
       const { setIncomingCall } = useAppStore.getState();
       setIncomingCall(callData);
@@ -142,6 +200,9 @@ export const SocketProvider = ({ children }) => {
 
     socketInstance.on("recieveMessage", handleRecieveMessage);
     socketInstance.on("recieve-channel-message", handleRecieveChannelMessage);
+    socketInstance.on("channel-updated", handleChannelUpdated);
+    socketInstance.on("channel-deleted", handleChannelDeleted);
+    socketInstance.on("channel-member-removed", handleChannelMemberRemoved);
     socketInstance.on("incoming-call", handleIncomingCall);
     socketInstance.on("call-accepted", handleCallAccepted);
     socketInstance.on("call-rejected", handleCallRejected);
@@ -150,6 +211,9 @@ export const SocketProvider = ({ children }) => {
     return () => {
       socketInstance.off("recieveMessage", handleRecieveMessage);
       socketInstance.off("recieve-channel-message", handleRecieveChannelMessage);
+      socketInstance.off("channel-updated", handleChannelUpdated);
+      socketInstance.off("channel-deleted", handleChannelDeleted);
+      socketInstance.off("channel-member-removed", handleChannelMemberRemoved);
       socketInstance.off("incoming-call", handleIncomingCall);
       socketInstance.off("call-accepted", handleCallAccepted);
       socketInstance.off("call-rejected", handleCallRejected);

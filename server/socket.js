@@ -1,6 +1,10 @@
 import { Server as SocketIOServer } from "socket.io";
 import Message from "./models/MessagesModel.js";
 import Channel from "./models/ChannelModel.js";
+import {
+  getChannelMemberIds,
+  isChannelMember,
+} from "./utils/channelPermissions.js";
 
 const CALL_EVENTS = {
   JOIN_CALL_ROOM: "join-call-room",
@@ -11,6 +15,50 @@ const CALL_EVENTS = {
 const getCallRoomName = (callId) => `call:${callId}`;
 const isCallRoom = (roomName) => roomName.startsWith("call:");
 
+let ioInstance = null;
+const userSocketMap = new Map();
+const activeCallInvites = new Map();
+
+const getUserSocketId = (userId) => {
+  if (!userId) return null;
+  return userSocketMap.get(String(userId));
+};
+
+export const emitToUser = (userId, eventName, payload) => {
+  if (!ioInstance) return;
+
+  const socketId = getUserSocketId(userId);
+
+  if (socketId) {
+    ioInstance.to(socketId).emit(eventName, payload);
+  }
+};
+
+export const emitToManyUsers = (userIds, eventName, payload, excludedUserIds = []) => {
+  const excluded = new Set(excludedUserIds.map((id) => String(id)));
+
+  userIds.forEach((userId) => {
+    const normalizedUserId = String(userId);
+
+    if (excluded.has(normalizedUserId)) {
+      return;
+    }
+
+    emitToUser(normalizedUserId, eventName, payload);
+  });
+};
+
+const disconnect = (socket) => {
+  console.log(`Client disconnected: ${socket.id}`);
+
+  for (const [userId, socketId] of userSocketMap.entries()) {
+    if (socketId === socket.id) {
+      userSocketMap.delete(userId);
+      break;
+    }
+  }
+};
+
 const setupSocket = (server) => {
   const io = new SocketIOServer(server, {
     cors: {
@@ -20,46 +68,7 @@ const setupSocket = (server) => {
     },
   });
 
-  const userSocketMap = new Map();
-  const activeCallInvites = new Map();
-
-  const getUserSocketId = (userId) => {
-    if (!userId) return null;
-    return userSocketMap.get(String(userId));
-  };
-
-  const emitToUser = (userId, eventName, payload) => {
-    const socketId = getUserSocketId(userId);
-
-    if (socketId) {
-      io.to(socketId).emit(eventName, payload);
-    }
-  };
-
-  const emitToManyUsers = (userIds, eventName, payload, excludedUserIds = []) => {
-    const excluded = new Set(excludedUserIds.map((id) => String(id)));
-
-    userIds.forEach((userId) => {
-      const normalizedUserId = String(userId);
-
-      if (excluded.has(normalizedUserId)) {
-        return;
-      }
-
-      emitToUser(normalizedUserId, eventName, payload);
-    });
-  };
-
-  const disconnect = (socket) => {
-    console.log(`Client disconnected: ${socket.id}`);
-
-    for (const [userId, socketId] of userSocketMap.entries()) {
-      if (socketId === socket.id) {
-        userSocketMap.delete(userId);
-        break;
-      }
-    }
-  };
+  ioInstance = io;
 
   const sendMessage = async (message) => {
     const senderSocketId = getUserSocketId(message.sender);
@@ -83,6 +92,16 @@ const setupSocket = (server) => {
   const sendChannelMessage = async (message) => {
     const { channelId, sender, content, messageType, fileUrl } = message;
 
+    const channel = await Channel.findById(channelId);
+
+    if (!channel) {
+      return;
+    }
+
+    if (!isChannelMember(channel, sender)) {
+      return;
+    }
+
     const createdMessage = await Message.create({
       sender,
       recipient: null,
@@ -96,33 +115,25 @@ const setupSocket = (server) => {
       .populate("sender", "id email firstName lastName image color")
       .exec();
 
-    await Channel.findByIdAndUpdate(channelId, {
-      $push: { messages: createdMessage._id },
-    });
+    const updatedChannel = await Channel.findByIdAndUpdate(
+      channelId,
+      {
+        $push: { messages: createdMessage._id },
+      },
+      { new: true }
+    );
 
-    const channel = await Channel.findById(channelId)
-      .populate("members")
-      .populate("admin");
-
-    const finalData = { ...messageData._doc, channelId: channel._id };
-
-    if (channel && channel.members) {
-      channel.members.forEach((member) => {
-        const memberSocketId = getUserSocketId(member._id.toString());
-
-        if (memberSocketId) {
-          io.to(memberSocketId).emit("recieve-channel-message", finalData);
-        }
-      });
-
-      if (channel.admin?._id) {
-        const adminSocketId = getUserSocketId(channel.admin._id.toString());
-
-        if (adminSocketId) {
-          io.to(adminSocketId).emit("recieve-channel-message", finalData);
-        }
-      }
+    if (!updatedChannel) {
+      return;
     }
+
+    const finalData = { ...messageData._doc, channelId: updatedChannel._id };
+
+    emitToManyUsers(
+      getChannelMemberIds(updatedChannel),
+      "recieve-channel-message",
+      finalData
+    );
   };
 
   const getRoomParticipantSocketIds = (callId) => {
@@ -213,12 +224,18 @@ const setupSocket = (server) => {
   const getChannelInviteTargets = async ({
     channelId,
     excludedUserIds = [],
+    requesterUserId = null,
   }) => {
-    const channel = await Channel.findById(channelId)
-      .populate("members", "email firstName lastName image color")
-      .populate("admin", "email firstName lastName image color");
+    const channel = await Channel.findById(channelId).populate(
+      "members.user",
+      "email firstName lastName image color"
+    );
 
     if (!channel) {
+      return null;
+    }
+
+    if (requesterUserId && !isChannelMember(channel, requesterUserId)) {
       return null;
     }
 
@@ -226,20 +243,18 @@ const setupSocket = (server) => {
     const recipients = new Map();
 
     channel.members.forEach((member) => {
-      const memberId = String(member._id);
+      const user = member.user;
+
+      if (!user?._id) {
+        return;
+      }
+
+      const memberId = String(user._id);
 
       if (!excluded.has(memberId)) {
-        recipients.set(memberId, member);
+        recipients.set(memberId, user);
       }
     });
-
-    if (channel.admin?._id) {
-      const adminId = String(channel.admin._id);
-
-      if (!excluded.has(adminId)) {
-        recipients.set(adminId, channel.admin);
-      }
-    }
 
     return {
       channel,
@@ -283,6 +298,7 @@ const setupSocket = (server) => {
     const result = await getChannelInviteTargets({
       channelId,
       excludedUserIds: [inviterId],
+      requesterUserId: inviterId,
     });
 
     if (!result) {
@@ -339,6 +355,7 @@ const setupSocket = (server) => {
     const result = await getChannelInviteTargets({
       channelId,
       excludedUserIds: Array.from(excludedUserIds),
+      requesterUserId: inviterId,
     });
 
     if (!result) {

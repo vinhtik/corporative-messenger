@@ -22,6 +22,12 @@ export const CHANNEL_ROUTES = "api/channel";
 export const CREATE_CHANNEL_ROUTE = `${CHANNEL_ROUTES}/create-channel`;
 export const GET_USER_CHANNELS_ROUTE = `${CHANNEL_ROUTES}/get-user-channels`;
 export const GET_CHANNEL_MESSAGES = `${CHANNEL_ROUTES}/get-channel-messages`;
+export const GET_CHANNEL_ROUTE = `${CHANNEL_ROUTES}/get-channel`;
+export const UPDATE_CHANNEL_ROUTE = `${CHANNEL_ROUTES}/update-channel`;
+export const ADD_CHANNEL_MEMBERS_ROUTE = `${CHANNEL_ROUTES}/add-members`;
+export const DELETE_CHANNEL_MEMBER_ROUTE = `${CHANNEL_ROUTES}/members`;
+export const UPDATE_CHANNEL_MEMBER_ROLE_ROUTE = `${CHANNEL_ROUTES}/members`;
+export const DELETE_CHANNEL_ROUTE = `${CHANNEL_ROUTES}/delete-channel`;
 
 export const CALLS_ROUTES = "api/calls";
 export const LIVEKIT_TOKEN_ROUTE = `${CALLS_ROUTES}/livekit-token`;
