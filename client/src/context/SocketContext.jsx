@@ -127,8 +127,13 @@ export const SocketProvider = ({ children }) => {
         return;
       }
 
-      if (callData?.reason === "missed") {
-        toast.info("Никто не присоединился к звонку.");
+      if (callData?.reason === "empty") {
+        toast.info("В звонке больше никого не осталось.");
+        return;
+      }
+
+      if (callData?.reason === "no-users-to-invite") {
+        toast.info("Больше некого приглашать в звонок.");
         return;
       }
 

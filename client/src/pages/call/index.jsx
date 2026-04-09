@@ -1,37 +1,31 @@
 import "@livekit/components-styles";
 import {
-  GridLayout,
   ParticipantTile,
   RoomAudioRenderer,
   RoomContext,
+  useIsSpeaking,
   useTracks,
 } from "@livekit/components-react";
 import { useSocket } from "@/context/SocketContext";
 import { apiClient } from "@/lib/api-client";
 import { useAppStore } from "@/store";
 import { LIVEKIT_TOKEN_ROUTE } from "@/utils/constants";
-import { ArrowLeft, Mic, MicOff, MonitorUp, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
+import {
+  ArrowLeft,
+  Maximize2,
+  Mic,
+  MicOff,
+  MonitorUp,
+  Phone,
+  PhoneOff,
+  UserPlus,
+  Video,
+  VideoOff,
+} from "lucide-react";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-
-const CallGrid = () => {
-  const tracks = useTracks([
-    { source: Track.Source.Camera, withPlaceholder: true },
-    { source: Track.Source.ScreenShare, withPlaceholder: false },
-  ]);
-
-  return (
-    <>
-      <RoomAudioRenderer />
-      <div className="h-full w-full p-4 overflow-auto">
-        <GridLayout tracks={tracks}>
-          <ParticipantTile />
-        </GridLayout>
-      </div>
-    </>
-  );
-};
+import { toast } from "sonner";
 
 const baseButtonClass =
   "h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200";
@@ -47,6 +41,217 @@ const buildUserPayload = (userInfo) => ({
   image: userInfo.image,
   color: userInfo.color,
 });
+
+const parseMetadata = (participant) => {
+  try {
+    return JSON.parse(participant?.metadata || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const getParticipantLabel = (participant) => {
+  if (!participant) {
+    return "Участник";
+  }
+
+  const metadata = parseMetadata(participant);
+  const metadataFullName = [metadata.firstName, metadata.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (participant.name) {
+    return participant.name;
+  }
+
+  if (metadataFullName) {
+    return metadataFullName;
+  }
+
+  if (metadata.email) {
+    return metadata.email;
+  }
+
+  return participant.identity || "Участник";
+};
+
+const getTrackKey = (trackRef) => {
+  const participantId =
+    trackRef?.participant?.identity ||
+    trackRef?.participant?.sid ||
+    "unknown-participant";
+
+  const source =
+    trackRef?.source ||
+    trackRef?.publication?.source ||
+    "unknown-source";
+
+  const publicationId =
+    trackRef?.publication?.trackSid ||
+    trackRef?.publication?.sid ||
+    "placeholder";
+
+  return `${participantId}:${source}:${publicationId}`;
+};
+
+const isScreenShareTrack = (trackRef) =>
+  trackRef?.source === Track.Source.ScreenShare;
+
+const CallTile = ({ trackRef, isFocused = false, onClick }) => {
+  const participant = trackRef?.participant;
+  const isSpeaking = useIsSpeaking(participant);
+  const title = getParticipantLabel(participant);
+  const isScreen = isScreenShareTrack(trackRef);
+  const isLocal = Boolean(participant?.isLocal);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-2xl text-left transition-all duration-200 ${
+        isFocused
+          ? "h-full w-full bg-black border-2 border-green-500/40"
+          : isSpeaking
+          ? "h-full w-full bg-black border-2 border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,0.3)]"
+          : "h-full w-full bg-black border border-[#2f303b] hover:border-green-500/40"
+      }`}
+      title="Нажми, чтобы увеличить"
+    >
+      <ParticipantTile trackRef={trackRef} className="h-full w-full" />
+
+      <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-black/70 px-3 py-1 text-xs text-white backdrop-blur">
+          {title}
+        </span>
+
+        {isLocal && (
+          <span className="rounded-full bg-[#1f2937]/80 px-2 py-1 text-[10px] uppercase tracking-wide text-white">
+            Вы
+          </span>
+        )}
+
+        {isScreen && (
+          <span className="rounded-full bg-blue-600/80 px-2 py-1 text-[10px] uppercase tracking-wide text-white">
+            Экран
+          </span>
+        )}
+      </div>
+
+      <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/60 p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <Maximize2 className="h-4 w-4 text-white" />
+      </div>
+    </button>
+  );
+};
+
+const CallStage = ({ focusedTrackKey, onFocusChange }) => {
+  const tracks = useTracks([
+    { source: Track.Source.Camera, withPlaceholder: true },
+    { source: Track.Source.ScreenShare, withPlaceholder: false },
+  ]);
+
+  useEffect(() => {
+    if (!focusedTrackKey) {
+      const screenTrack = tracks.find((trackRef) => isScreenShareTrack(trackRef));
+
+      if (screenTrack) {
+        onFocusChange(getTrackKey(screenTrack));
+      }
+
+      return;
+    }
+
+    const exists = tracks.some((trackRef) => getTrackKey(trackRef) === focusedTrackKey);
+
+    if (!exists) {
+      const screenTrack = tracks.find((trackRef) => isScreenShareTrack(trackRef));
+      onFocusChange(screenTrack ? getTrackKey(screenTrack) : null);
+    }
+  }, [focusedTrackKey, tracks, onFocusChange]);
+
+  const focusedTrack = useMemo(
+    () => tracks.find((trackRef) => getTrackKey(trackRef) === focusedTrackKey) || null,
+    [tracks, focusedTrackKey]
+  );
+
+  const secondaryTracks = useMemo(() => {
+    if (!focusedTrack) {
+      return tracks;
+    }
+
+    const focusedKey = getTrackKey(focusedTrack);
+
+    return tracks.filter((trackRef) => getTrackKey(trackRef) !== focusedKey);
+  }, [tracks, focusedTrack]);
+
+  if (!tracks.length) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-neutral-400">
+        Ожидание участников...
+      </div>
+    );
+  }
+
+  if (focusedTrack) {
+    return (
+      <div className="h-full w-full p-4 flex gap-4 overflow-hidden">
+        <div className="min-w-0 flex-1">
+          <CallTile
+            trackRef={focusedTrack}
+            isFocused={true}
+            onClick={() => onFocusChange(null)}
+          />
+        </div>
+
+        <div className="w-[340px] max-w-[40%] shrink-0 overflow-auto pr-1">
+          <div className="grid grid-cols-1 gap-4 auto-rows-[200px]">
+            {secondaryTracks.map((trackRef) => {
+              const key = getTrackKey(trackRef);
+
+              return (
+                <CallTile
+                  key={key}
+                  trackRef={trackRef}
+                  onClick={() => onFocusChange(key)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const gridClass =
+    tracks.length <= 1
+      ? "grid-cols-1"
+      : tracks.length === 2
+      ? "grid-cols-1 md:grid-cols-2"
+      : tracks.length <= 4
+      ? "grid-cols-1 md:grid-cols-2"
+      : tracks.length <= 9
+      ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+      : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+
+  return (
+    <div className="h-full w-full p-4 overflow-auto">
+      <div className={`grid ${gridClass} gap-4 auto-rows-[240px]`}>
+        {tracks.map((trackRef) => {
+          const key = getTrackKey(trackRef);
+
+          return (
+            <CallTile
+              key={key}
+              trackRef={trackRef}
+              onClick={() => onFocusChange(key)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const CallPage = () => {
   const { callId } = useParams();
@@ -69,6 +274,10 @@ const CallPage = () => {
   );
 
   const isConnectedRef = useRef(false);
+  const hadRemoteParticipantRef = useRef(false);
+  const autoEndTimerRef = useRef(null);
+
+  const [focusedTrackKey, setFocusedTrackKey] = useState(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
@@ -78,6 +287,33 @@ const CallPage = () => {
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+
+  const clearAutoEndTimer = useCallback(() => {
+    if (autoEndTimerRef.current) {
+      clearTimeout(autoEndTimerRef.current);
+      autoEndTimerRef.current = null;
+    }
+  }, []);
+
+  const performLeave = useCallback(
+    (notifyServer = true) => {
+      clearAutoEndTimer();
+
+      if (notifyServer) {
+        socket?.emit("end-call", {
+          callId,
+          toUserId: peerId || null,
+          channelId: channelId || null,
+          chatType,
+        });
+      }
+
+      socket?.emit("leave-call-room", { callId });
+      room.disconnect();
+      navigate("/chat");
+    },
+    [socket, callId, peerId, channelId, chatType, room, navigate, clearAutoEndTimer]
+  );
 
   useEffect(() => {
     if (!socket || !callId) {
@@ -89,8 +325,7 @@ const CallPage = () => {
         return;
       }
 
-      room.disconnect();
-      navigate("/chat");
+      performLeave(false);
     };
 
     socket.on("call-ended", handleCallEnded);
@@ -98,7 +333,7 @@ const CallPage = () => {
     return () => {
       socket.off("call-ended", handleCallEnded);
     };
-  }, [socket, callId, room, navigate]);
+  }, [socket, callId, performLeave]);
 
   useEffect(() => {
     if (!callId) {
@@ -109,8 +344,24 @@ const CallPage = () => {
 
     let cancelled = false;
 
-    const updateParticipantsCount = (connectedValue = isConnectedRef.current) => {
-      setParticipantsCount(room.remoteParticipants.size + (connectedValue ? 1 : 0));
+    const syncRemoteParticipantState = (connectedValue = isConnectedRef.current) => {
+      const remoteCount = room.remoteParticipants.size;
+
+      setParticipantsCount(remoteCount + (connectedValue ? 1 : 0));
+
+      if (remoteCount > 0) {
+        hadRemoteParticipantRef.current = true;
+        clearAutoEndTimer();
+        return;
+      }
+
+      if (connectedValue && hadRemoteParticipantRef.current && !autoEndTimerRef.current) {
+        toast.info("В комнате больше никого нет. Звонок завершится через 10 секунд.");
+
+        autoEndTimerRef.current = setTimeout(() => {
+          performLeave(true);
+        }, 10000);
+      }
     };
 
     const connectToRoom = async () => {
@@ -172,7 +423,7 @@ const CallPage = () => {
         setIsMicEnabled(true);
         setIsCameraEnabled(true);
         setIsLoading(false);
-        updateParticipantsCount(true);
+        syncRemoteParticipantState(true);
       } catch (err) {
         console.log(err);
         setErrorText("Не удалось подключиться к звонку.");
@@ -183,21 +434,21 @@ const CallPage = () => {
     const handleConnected = () => {
       isConnectedRef.current = true;
       setIsConnected(true);
-      updateParticipantsCount(true);
+      syncRemoteParticipantState(true);
     };
 
     const handleDisconnected = () => {
       isConnectedRef.current = false;
       setIsConnected(false);
-      updateParticipantsCount(false);
+      syncRemoteParticipantState(false);
     };
 
     const handleParticipantConnected = () => {
-      updateParticipantsCount(true);
+      syncRemoteParticipantState(true);
     };
 
     const handleParticipantDisconnected = () => {
-      updateParticipantsCount(true);
+      syncRemoteParticipantState(true);
     };
 
     room.on(RoomEvent.Connected, handleConnected);
@@ -209,6 +460,7 @@ const CallPage = () => {
 
     return () => {
       cancelled = true;
+      clearAutoEndTimer();
 
       socket?.emit("leave-call-room", { callId });
 
@@ -219,7 +471,7 @@ const CallPage = () => {
 
       room.disconnect();
     };
-  }, [callId, room, userInfo, chatType, socket]);
+  }, [callId, room, userInfo, chatType, socket, clearAutoEndTimer, performLeave]);
 
   const toggleMicrophone = async () => {
     try {
@@ -251,16 +503,19 @@ const CallPage = () => {
     }
   };
 
-  const endCall = () => {
-    socket?.emit("end-call", {
+  const reinviteParticipants = () => {
+    if (!socket || !channelId || !userInfo?.id) {
+      return;
+    }
+
+    socket.emit("invite-channel-to-call", {
       callId,
-      toUserId: peerId || null,
-      channelId: channelId || null,
-      chatType,
+      channelId,
+      mode: "video",
+      fromUser: buildUserPayload(userInfo),
     });
 
-    room.disconnect();
-    navigate("/chat");
+    toast.success("Оставшимся участникам отправлено приглашение.");
   };
 
   const title = isConnected
@@ -307,32 +562,50 @@ const CallPage = () => {
   return (
     <RoomContext.Provider value={room}>
       <div className="h-screen w-full flex flex-col bg-[#1c1d25] text-white">
-        <div className="h-[72px] shrink-0 border-b border-[#2f303b] px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-full bg-[#ffffff18] flex items-center justify-center">
+        <div className="h-[72px] shrink-0 border-b border-[#2f303b] px-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-11 w-11 rounded-full bg-[#ffffff18] flex items-center justify-center shrink-0">
               <Phone className="h-5 w-5" />
             </div>
 
-            <div>
-              <p className="text-lg font-semibold">{title}</p>
-              <p className="text-sm text-neutral-400">
+            <div className="min-w-0">
+              <p className="text-lg font-semibold truncate">{title}</p>
+              <p className="text-sm text-neutral-400 truncate">
                 участников: {participantsCount} · {isConnected ? "connected" : "connecting"}
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={endCall}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#2f303b] px-4 py-2 text-sm text-neutral-300 hover:bg-[#2a2c37] transition-all duration-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Назад
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            {chatType === "channel" && (
+              <button
+                type="button"
+                onClick={reinviteParticipants}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#2f303b] px-4 py-2 text-sm text-neutral-300 hover:bg-[#2a2c37] transition-all duration-200"
+                title="Позвать тех, кто ещё не в звонке"
+              >
+                <UserPlus className="h-4 w-4" />
+                Позвать
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => performLeave(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[#2f303b] px-4 py-2 text-sm text-neutral-300 hover:bg-[#2a2c37] transition-all duration-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Назад
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0">
-          <CallGrid />
+          <RoomAudioRenderer />
+          <CallStage
+            focusedTrackKey={focusedTrackKey}
+            onFocusChange={setFocusedTrackKey}
+          />
         </div>
 
         <div className="shrink-0 border-t border-[#2f303b] bg-[#181920] px-6 py-5 flex items-center justify-center gap-4">
@@ -369,7 +642,7 @@ const CallPage = () => {
 
           <button
             type="button"
-            onClick={endCall}
+            onClick={() => performLeave(true)}
             className={dangerButtonClass}
             title="Завершить звонок"
           >

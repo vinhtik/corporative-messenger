@@ -5,6 +5,7 @@ import Channel from "./models/ChannelModel.js";
 const CALL_EVENTS = {
   JOIN_CALL_ROOM: "join-call-room",
   LEAVE_CALL_ROOM: "leave-call-room",
+  INVITE_CHANNEL_TO_CALL: "invite-channel-to-call",
 };
 
 const getCallRoomName = (callId) => `call:${callId}`;
@@ -124,27 +125,6 @@ const setupSocket = (server) => {
     }
   };
 
-  const setActiveInvite = (callId, payload) => {
-    activeCallInvites.set(callId, {
-      ...payload,
-      invitedUserIds: new Set((payload.invitedUserIds || []).map((id) => String(id))),
-    });
-  };
-
-  const removeInviteeFromCall = (callId, userId) => {
-    const invite = activeCallInvites.get(callId);
-    if (!invite || !userId) return invite || null;
-
-    invite.invitedUserIds.delete(String(userId));
-
-    if (!invite.invitedUserIds.size && invite.chatType === "contact") {
-      activeCallInvites.delete(callId);
-      return null;
-    }
-
-    return invite;
-  };
-
   const getRoomParticipantSocketIds = (callId) => {
     const roomName = getCallRoomName(callId);
     return Array.from(io.sockets.adapter.rooms.get(roomName) || []);
@@ -155,6 +135,52 @@ const setupSocket = (server) => {
       .map((socketId) => io.sockets.sockets.get(socketId)?.data?.userId)
       .filter(Boolean)
       .map((userId) => String(userId));
+  };
+
+  const cleanupInviteIfUnused = (callId) => {
+    const invite = activeCallInvites.get(callId);
+
+    if (!invite) {
+      return;
+    }
+
+    const roomUserIds = getRoomParticipantUserIds(callId);
+
+    if (!roomUserIds.length && invite.invitedUserIds.size === 0) {
+      activeCallInvites.delete(callId);
+    }
+  };
+
+  const setActiveInvite = (callId, payload) => {
+    activeCallInvites.set(callId, {
+      ...payload,
+      invitedUserIds: new Set((payload.invitedUserIds || []).map((id) => String(id))),
+    });
+  };
+
+  const mergeInviteesIntoCall = (callId, userIds) => {
+    const invite = activeCallInvites.get(callId);
+
+    if (!invite) {
+      return;
+    }
+
+    userIds.forEach((userId) => {
+      invite.invitedUserIds.add(String(userId));
+    });
+  };
+
+  const removeInviteeFromCall = (callId, userId) => {
+    const invite = activeCallInvites.get(callId);
+
+    if (!invite || !userId) {
+      return invite || null;
+    }
+
+    invite.invitedUserIds.delete(String(userId));
+    cleanupInviteIfUnused(callId);
+
+    return activeCallInvites.get(callId) || null;
   };
 
   const leaveSpecificCallRoom = (socket, callId) => {
@@ -171,6 +197,8 @@ const setupSocket = (server) => {
     if (socket.data.currentCallId === callId) {
       socket.data.currentCallId = null;
     }
+
+    cleanupInviteIfUnused(callId);
   };
 
   const leaveAllCallRooms = (socket) => {
@@ -180,6 +208,43 @@ const setupSocket = (server) => {
         const callId = roomName.replace("call:", "");
         leaveSpecificCallRoom(socket, callId);
       });
+  };
+
+  const getChannelInviteTargets = async ({
+    channelId,
+    excludedUserIds = [],
+  }) => {
+    const channel = await Channel.findById(channelId)
+      .populate("members", "email firstName lastName image color")
+      .populate("admin", "email firstName lastName image color");
+
+    if (!channel) {
+      return null;
+    }
+
+    const excluded = new Set(excludedUserIds.map((id) => String(id)));
+    const recipients = new Map();
+
+    channel.members.forEach((member) => {
+      const memberId = String(member._id);
+
+      if (!excluded.has(memberId)) {
+        recipients.set(memberId, member);
+      }
+    });
+
+    if (channel.admin?._id) {
+      const adminId = String(channel.admin._id);
+
+      if (!excluded.has(adminId)) {
+        recipients.set(adminId, channel.admin);
+      }
+    }
+
+    return {
+      channel,
+      recipients,
+    };
   };
 
   const callUser = async (payload) => {
@@ -214,32 +279,17 @@ const setupSocket = (server) => {
       return;
     }
 
-    const channel = await Channel.findById(channelId)
-      .populate("members", "email firstName lastName image color")
-      .populate("admin", "email firstName lastName image color");
+    const inviterId = String(fromUser?._id || "");
+    const result = await getChannelInviteTargets({
+      channelId,
+      excludedUserIds: [inviterId],
+    });
 
-    if (!channel) {
+    if (!result) {
       return;
     }
 
-    const recipients = new Map();
-    const inviterId = String(fromUser?._id);
-
-    channel.members.forEach((member) => {
-      const memberId = String(member._id);
-
-      if (memberId !== inviterId) {
-        recipients.set(memberId, member);
-      }
-    });
-
-    if (channel.admin?._id) {
-      const adminId = String(channel.admin._id);
-
-      if (adminId !== inviterId) {
-        recipients.set(adminId, channel.admin);
-      }
-    }
+    const { channel, recipients } = result;
 
     setActiveInvite(callId, {
       callId,
@@ -269,6 +319,61 @@ const setupSocket = (server) => {
     });
   };
 
+  const inviteChannelToCall = async (payload) => {
+    const { callId, mode, fromUser, channelId } = payload;
+
+    if (!callId || !channelId) {
+      return;
+    }
+
+    const inviterId = String(fromUser?._id || "");
+    const roomUserIds = getRoomParticipantUserIds(callId);
+    const invite = activeCallInvites.get(callId);
+
+    const excludedUserIds = new Set([inviterId, ...roomUserIds]);
+
+    if (invite) {
+      invite.invitedUserIds.forEach((userId) => excludedUserIds.add(String(userId)));
+    }
+
+    const result = await getChannelInviteTargets({
+      channelId,
+      excludedUserIds: Array.from(excludedUserIds),
+    });
+
+    if (!result) {
+      return;
+    }
+
+    const { channel, recipients } = result;
+
+    if (!recipients.size) {
+      emitToUser(inviterId, "call-ended", {
+        callId,
+        fromUserId: inviterId,
+        reason: "no-users-to-invite",
+      });
+      return;
+    }
+
+    mergeInviteesIntoCall(callId, Array.from(recipients.keys()));
+
+    recipients.forEach((_, recipientId) => {
+      emitToUser(recipientId, "incoming-call", {
+        callId,
+        mode,
+        chatType: "channel",
+        fromUser,
+        channelId: channel._id.toString(),
+        channel: {
+          _id: channel._id.toString(),
+          name: channel.name,
+        },
+        createdAt: new Date().toISOString(),
+      });
+    });
+  };
+
   const acceptCall = async (payload) => {
     const { callId, mode, chatType, toUserId, fromUser, channelId, channel } = payload;
 
@@ -276,11 +381,7 @@ const setupSocket = (server) => {
       return;
     }
 
-    const invite = removeInviteeFromCall(callId, fromUser?._id);
-
-    if (chatType === "contact" && !invite) {
-      activeCallInvites.delete(callId);
-    }
+    removeInviteeFromCall(callId, fromUser?._id);
 
     emitToUser(toUserId, "call-accepted", {
       callId,
@@ -299,7 +400,7 @@ const setupSocket = (server) => {
       return;
     }
 
-    const invite = removeInviteeFromCall(callId, fromUser?._id);
+    const updatedInvite = removeInviteeFromCall(callId, fromUser?._id);
 
     emitToUser(toUserId, "call-rejected", {
       callId,
@@ -321,16 +422,15 @@ const setupSocket = (server) => {
       return;
     }
 
-    const roomParticipants = getRoomParticipantUserIds(callId);
-    const roomHasOtherPeople = roomParticipants.some(
+    const roomParticipants = getRoomParticipantUserIds(callId).filter(
       (userId) => String(userId) !== String(toUserId)
     );
 
-    if (invite && !invite.invitedUserIds.size && !roomHasOtherPeople) {
+    if ((!updatedInvite || updatedInvite.invitedUserIds.size === 0) && roomParticipants.length === 0) {
       emitToUser(toUserId, "call-ended", {
         callId,
         fromUserId: fromUser?._id || null,
-        reason: "missed",
+        reason: "empty",
       });
 
       activeCallInvites.delete(callId);
@@ -423,6 +523,7 @@ const setupSocket = (server) => {
 
     socket.on("call-user", callUser);
     socket.on("call-channel", callChannel);
+    socket.on(CALL_EVENTS.INVITE_CHANNEL_TO_CALL, inviteChannelToCall);
     socket.on("accept-call", acceptCall);
     socket.on("reject-call", rejectCall);
     socket.on("end-call", (payload) => endCall(socket, payload));

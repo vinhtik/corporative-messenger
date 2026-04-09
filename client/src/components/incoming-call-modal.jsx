@@ -3,7 +3,7 @@ import { useSocket } from "@/context/SocketContext";
 import { getColor } from "@/lib/utils";
 import { useAppStore } from "@/store";
 import { HOST } from "@/utils/constants";
-import { Phone, PhoneOff } from "lucide-react";
+import { Phone, PhoneOff, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const getDisplayName = (user) => {
@@ -50,6 +50,7 @@ const IncomingCallModal = () => {
   const caller = incomingCall.fromUser;
   const callerName = getDisplayName(caller);
   const imageSrc = getImageSrc(caller?.image);
+  const isChannelCall = incomingCall.chatType === "channel";
 
   const acceptCall = () => {
     if (!socket || !userInfo?.id) {
@@ -72,11 +73,11 @@ const IncomingCallModal = () => {
       initiator: "false",
     });
 
-    if (incomingCall.chatType === "channel" && incomingCall.channelId) {
+    if (isChannelCall && incomingCall.channelId) {
       params.set("channelId", incomingCall.channelId);
     }
 
-    if (incomingCall.chatType !== "channel" && incomingCall.fromUser?._id) {
+    if (!isChannelCall && incomingCall.fromUser?._id) {
       params.set("peerId", incomingCall.fromUser._id);
     }
 
@@ -130,7 +131,7 @@ const IncomingCallModal = () => {
 
           <h2 className="text-2xl font-semibold mb-2">{callerName}</h2>
 
-          {incomingCall.chatType === "channel" && incomingCall.channel?.name ? (
+          {isChannelCall && incomingCall.channel?.name ? (
             <p className="text-neutral-400 mb-3">
               приглашает в группу <span className="text-white">{incomingCall.channel.name}</span>
             </p>
@@ -139,8 +140,8 @@ const IncomingCallModal = () => {
           )}
 
           <div className="flex items-center gap-2 rounded-full bg-[#232531] px-4 py-2 text-sm text-neutral-300">
-            <Phone className="h-4 w-4" />
-            Звонок
+            {isChannelCall ? <UserPlus className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+            {isChannelCall ? "Присоединиться к звонку" : "Звонок"}
           </div>
 
           <div className="mt-8 flex items-center gap-5">
