@@ -3,9 +3,8 @@ import { useSocket } from "@/context/SocketContext";
 import { getColor } from "@/lib/utils";
 import { useAppStore } from "@/store";
 import { HOST } from "@/utils/constants";
-import { Phone, PhoneOff, Video } from "lucide-react";
+import { Phone, PhoneOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 
 const getDisplayName = (user) => {
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
@@ -50,7 +49,6 @@ const IncomingCallModal = () => {
 
   const caller = incomingCall.fromUser;
   const callerName = getDisplayName(caller);
-  const isVideo = incomingCall.mode === "video";
   const imageSrc = getImageSrc(caller?.image);
 
   const acceptCall = () => {
@@ -58,36 +56,44 @@ const IncomingCallModal = () => {
       return;
     }
 
-    if (incomingCall.chatType === "channel") {
-      toast.info("Групповые WebRTC-звонки пока не включены.");
-      clearIncomingCall();
-      return;
-    }
-
     socket.emit("accept-call", {
       callId: incomingCall.callId,
-      mode: incomingCall.mode,
+      mode: "video",
       chatType: incomingCall.chatType,
       toUserId: incomingCall.fromUser._id,
       fromUser: buildUserPayload(userInfo),
-      channelId: incomingCall.channelId,
+      channelId: incomingCall.channelId || null,
+      channel: incomingCall.channel || null,
     });
 
-    const nextUrl = `/call/${incomingCall.callId}?mode=${incomingCall.mode}&peerId=${incomingCall.fromUser._id}&initiator=false`;
+    const params = new URLSearchParams({
+      mode: "video",
+      chatType: incomingCall.chatType || "contact",
+      initiator: "false",
+    });
+
+    if (incomingCall.chatType === "channel" && incomingCall.channelId) {
+      params.set("channelId", incomingCall.channelId);
+    }
+
+    if (incomingCall.chatType !== "channel" && incomingCall.fromUser?._id) {
+      params.set("peerId", incomingCall.fromUser._id);
+    }
 
     clearIncomingCall();
-    navigate(nextUrl);
+    navigate(`/call/${incomingCall.callId}?${params.toString()}`);
   };
 
   const rejectCall = () => {
     if (socket && userInfo?.id) {
       socket.emit("reject-call", {
         callId: incomingCall.callId,
-        mode: incomingCall.mode,
+        mode: "video",
         chatType: incomingCall.chatType,
         toUserId: incomingCall.fromUser._id,
         fromUser: buildUserPayload(userInfo),
-        channelId: incomingCall.channelId,
+        channelId: incomingCall.channelId || null,
+        channel: incomingCall.channel || null,
       });
     }
 
@@ -133,8 +139,8 @@ const IncomingCallModal = () => {
           )}
 
           <div className="flex items-center gap-2 rounded-full bg-[#232531] px-4 py-2 text-sm text-neutral-300">
-            {isVideo ? <Video className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
-            {isVideo ? "Видеозвонок" : "Голосовой звонок"}
+            <Phone className="h-4 w-4" />
+            Звонок
           </div>
 
           <div className="mt-8 flex items-center gap-5">
@@ -153,7 +159,7 @@ const IncomingCallModal = () => {
               className="h-14 w-14 rounded-full bg-green-600 flex items-center justify-center hover:bg-green-700 transition-all duration-200"
               title="Принять"
             >
-              {isVideo ? <Video className="h-6 w-6" /> : <Phone className="h-6 w-6" />}
+              <Phone className="h-6 w-6" />
             </button>
           </div>
         </div>

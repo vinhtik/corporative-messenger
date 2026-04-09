@@ -3,7 +3,7 @@ import { useSocket } from "@/context/SocketContext";
 import { getColor } from "@/lib/utils";
 import { useAppStore } from "@/store";
 import { HOST } from "@/utils/constants";
-import { Phone, Video } from "lucide-react";
+import { Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { RiCloseFill } from "react-icons/ri";
@@ -15,10 +15,6 @@ const createShortCallId = (prefix = "call") => {
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
   return `${prefix}-${randomPart}`;
-};
-
-const buildDmCallId = () => {
-  return createShortCallId("dm");
 };
 
 const buildUserPayload = (userInfo) => ({
@@ -36,7 +32,7 @@ const ChatHeader = () => {
 
   const { closeChat, selectedChatData, selectedChatType, userInfo } = useAppStore();
 
-  const startCall = (mode = "audio") => {
+  const startCall = () => {
     if (!socket) {
       toast.error("Сокет ещё не подключился. Попробуй снова через секунду.");
       return;
@@ -46,24 +42,46 @@ const ChatHeader = () => {
       return;
     }
 
+    const fromUser = buildUserPayload(userInfo);
+
     if (selectedChatType === "channel") {
-      toast.info("Групповые звонки будут следующим этапом. Сейчас работает только 1 на 1.");
+      const callId = createShortCallId("channel");
+
+      socket.emit("call-channel", {
+        callId,
+        mode: "video",
+        fromUser,
+        channelId: selectedChatData._id,
+      });
+
+      const params = new URLSearchParams({
+        mode: "video",
+        chatType: "channel",
+        channelId: selectedChatData._id,
+        initiator: "true",
+      });
+
+      navigate(`/call/${callId}?${params.toString()}`);
       return;
     }
 
-    const fromUser = buildUserPayload(userInfo);
-    const callId = buildDmCallId();
+    const callId = createShortCallId("dm");
 
     socket.emit("call-user", {
       callId,
-      mode,
+      mode: "video",
       fromUser,
       targetUserId: selectedChatData._id,
     });
 
-    navigate(
-      `/call/${callId}?mode=${mode}&peerId=${selectedChatData._id}&initiator=true`
-    );
+    const params = new URLSearchParams({
+      mode: "video",
+      chatType: "contact",
+      peerId: selectedChatData._id,
+      initiator: "true",
+    });
+
+    navigate(`/call/${callId}?${params.toString()}`);
   };
 
   return (
@@ -111,19 +129,10 @@ const ChatHeader = () => {
           <button
             type="button"
             className="text-neutral-400 hover:text-white duration-200 transition-all rounded-full p-2 hover:bg-[#2a2c37]"
-            onClick={() => startCall("audio")}
-            title="Голосовой звонок"
+            onClick={startCall}
+            title="Звонок"
           >
             <Phone className="h-5 w-5" />
-          </button>
-
-          <button
-            type="button"
-            className="text-neutral-400 hover:text-white duration-200 transition-all rounded-full p-2 hover:bg-[#2a2c37]"
-            onClick={() => startCall("video")}
-            title="Видеозвонок"
-          >
-            <Video className="h-5 w-5" />
           </button>
 
           <button

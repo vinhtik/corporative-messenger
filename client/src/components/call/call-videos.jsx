@@ -11,12 +11,27 @@ const attachStream = (element, stream) => {
   }
 };
 
+const getParticipantName = (user, fallback) => {
+  if (!user) {
+    return fallback;
+  }
+
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+
+  if (fullName) {
+    return fullName;
+  }
+
+  return user.email || fallback;
+};
+
 const VideoCard = ({
   title,
   stream,
   muted = false,
-  isVideoEnabled = true,
+  forcePlaceholder = false,
   placeholderText,
+  mirror = false,
 }) => {
   const videoRef = useRef(null);
 
@@ -25,8 +40,12 @@ const VideoCard = ({
   }, [stream]);
 
   const hasVideoTrack = Boolean(
-    stream?.getVideoTracks?.().some((track) => track.readyState === "live")
+    stream?.getVideoTracks?.().some(
+      (track) => track.readyState === "live" && track.enabled
+    )
   );
+
+  const showPlaceholder = forcePlaceholder || !hasVideoTrack;
 
   return (
     <div className="rounded-2xl overflow-hidden border border-[#2f303b] bg-black min-h-[260px] relative">
@@ -40,19 +59,19 @@ const VideoCard = ({
           autoPlay
           playsInline
           muted={muted}
-          className={`h-full w-full object-cover ${
-            hasVideoTrack && isVideoEnabled ? "block" : "hidden"
+          className={`h-full w-full object-cover ${mirror ? "scale-x-[-1]" : ""} ${
+            showPlaceholder ? "hidden" : "block"
           }`}
         />
 
-        {(!hasVideoTrack || !isVideoEnabled) && (
+        {showPlaceholder && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 gap-3">
-            {isVideoEnabled ? (
-              <Video className="h-10 w-10" />
-            ) : (
+            {placeholderText?.toLowerCase().includes("аудио") ? (
               <Phone className="h-10 w-10" />
+            ) : (
+              <Video className="h-10 w-10" />
             )}
-            <p className="text-sm">{placeholderText}</p>
+            <p className="text-sm text-center px-4">{placeholderText}</p>
           </div>
         )}
       </div>
@@ -62,27 +81,53 @@ const VideoCard = ({
 
 const CallVideos = ({
   localStream,
-  remoteStream,
+  remoteParticipants = [],
   isCameraEnabled,
+  isScreenSharing,
   mode = "audio",
 }) => {
+  const gridClass =
+    remoteParticipants.length >= 2
+      ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+      : "grid-cols-1 md:grid-cols-2";
+
   return (
-    <div className="h-full w-full p-4 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-auto">
+    <div className={`h-full w-full p-4 grid ${gridClass} gap-4 overflow-auto`}>
       <VideoCard
         title="Вы"
         stream={localStream}
         muted={true}
-        isVideoEnabled={mode === "video" ? isCameraEnabled : false}
-        placeholderText={mode === "video" ? "Камера выключена" : "Голосовой режим"}
+        mirror={true}
+        forcePlaceholder={mode === "audio" ? true : !(isCameraEnabled || isScreenSharing)}
+        placeholderText={
+          mode === "audio"
+            ? "Голосовой режим"
+            : isScreenSharing
+            ? "Демонстрация экрана"
+            : "Камера выключена"
+        }
       />
 
-      <VideoCard
-        title="Собеседник"
-        stream={remoteStream}
-        muted={false}
-        isVideoEnabled={true}
-        placeholderText="Ожидание видео собеседника"
-      />
+      {remoteParticipants.map((participant) => (
+        <VideoCard
+          key={participant.peerID}
+          title={getParticipantName(participant.user, "Участник")}
+          stream={participant.stream}
+          muted={false}
+          forcePlaceholder={false}
+          placeholderText="Ожидание видео участника"
+        />
+      ))}
+
+      {!remoteParticipants.length && (
+        <VideoCard
+          title="Собеседник"
+          stream={null}
+          muted={false}
+          forcePlaceholder={true}
+          placeholderText="Ожидание подключения участника"
+        />
+      )}
     </div>
   );
 };

@@ -102,11 +102,27 @@ export const SocketProvider = ({ children }) => {
       );
     };
 
+    const handleCallEnded = (callData) => {
+      const { incomingCall, clearIncomingCall } = useAppStore.getState();
+
+      if (incomingCall?.callId && incomingCall.callId === callData?.callId) {
+        clearIncomingCall();
+      }
+
+      if (callData?.reason === "rejected") {
+        toast.info("Звонок был отклонён.");
+        return;
+      }
+
+      toast.info("Звонок завершён.");
+    };
+
     socketInstance.on("recieveMessage", handleRecieveMessage);
     socketInstance.on("recieve-channel-message", handleRecieveChannelMessage);
     socketInstance.on("incoming-call", handleIncomingCall);
     socketInstance.on("call-accepted", handleCallAccepted);
     socketInstance.on("call-rejected", handleCallRejected);
+    socketInstance.on("call-ended", handleCallEnded);
 
     return () => {
       socketInstance.off("recieveMessage", handleRecieveMessage);
@@ -114,6 +130,7 @@ export const SocketProvider = ({ children }) => {
       socketInstance.off("incoming-call", handleIncomingCall);
       socketInstance.off("call-accepted", handleCallAccepted);
       socketInstance.off("call-rejected", handleCallRejected);
+      socketInstance.off("call-ended", handleCallEnded);
       socketInstance.disconnect();
       setSocket(null);
     };
