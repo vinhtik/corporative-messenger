@@ -75,7 +75,7 @@ const Auth = () => {
         max-lg:h-full max-lg:w-full bg-white border-2 border-white text-opacity-90 shadow-2xl xl:w-[50vw] overflow-scroll">
 
         <div className="absolute inset-0 rounded-2xl
-           bg-[url(@/assets/login2.jpg)] bg-no-repeat 
+          
              bg-cover opacity-0 z-0 animate-[pulse_10s_ease-in-out_infinite]">
         </div>
             

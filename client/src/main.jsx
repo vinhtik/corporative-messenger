@@ -6,10 +6,8 @@ import { Toaster } from 'sonner'
 import { SocketProvider } from './context/SocketContext'
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
     <SocketProvider>
       <App />
       <Toaster closeButton />
     </SocketProvider>
-  </StrictMode>
 )

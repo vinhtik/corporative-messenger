@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:6
+    container_name: mongo_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=corp-messenger
+    networks:
+      - mern-network
+
+  # Backend (Express.js)
+  server:
+    build: ./server
+    container_name: express_server
+    ports:
+      - "8747:8747"
+    environment:
+      - NODE_ENV=production
+      - PORT=8747
+      - JWT_KEY=D$WDA%D^@%FD@%^&AWGWUWA123k123
+      - ORIGIN=http://localhost:3000  
+      - DATABASE_URL=mongodb://mongodb:27017/corp-messenger
+    depends_on:
+      - mongodb
+    networks:
+      - mern-network
+    restart: unless-stopped
+
+  # Frontend (React/Vite)
+  client:
+    build: ./client
+    container_name: react_client
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_SERVER_URL=http://localhost:8747
+    depends_on:
+      - server
+    networks:
+      - mern-network
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+
+networks:
+  mern-network:
+    driver: bridge

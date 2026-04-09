@@ -1,7 +1,7 @@
 import { response } from "express";
 import User from "../models/UserModel.js";
 import jwt from "jsonwebtoken";
-import { compare } from "bcrypt";
+import bcrypt from "bcryptjs";
 import { renameSync, unlinkSync } from "fs"
 
 const maxAge = 3 * 24 * 60 * 60 * 1000;
@@ -44,7 +44,7 @@ export const login = async (request, response, next) => {
         if(!user){
             return response.status(404).send("User is not found");
         }
-        const auth = await compare(password, user.password);
+        const auth = await bcrypt.compare(password, user.password);
         if(!auth){
             return response.status(400).send("Email of Password is incorrect.")
         }
