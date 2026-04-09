@@ -5,12 +5,6 @@ import Channel from "./models/ChannelModel.js";
 const CALL_EVENTS = {
   JOIN_CALL_ROOM: "join-call-room",
   LEAVE_CALL_ROOM: "leave-call-room",
-  ADD_PEER: "add-peer",
-  REMOVE_PEER: "remove-peer",
-  RELAY_SDP: "relay-sdp",
-  RELAY_ICE: "relay-ice",
-  SESSION_DESCRIPTION: "session-description",
-  ICE_CANDIDATE: "ice-candidate",
 };
 
 const getCallRoomName = (callId) => `call:${callId}`;
@@ -26,8 +20,10 @@ const setupSocket = (server) => {
   });
 
   const userSocketMap = new Map();
+  const activeCallInvites = new Map();
 
   const getUserSocketId = (userId) => {
+    if (!userId) return null;
     return userSocketMap.get(String(userId));
   };
 
@@ -37,6 +33,20 @@ const setupSocket = (server) => {
     if (socketId) {
       io.to(socketId).emit(eventName, payload);
     }
+  };
+
+  const emitToManyUsers = (userIds, eventName, payload, excludedUserIds = []) => {
+    const excluded = new Set(excludedUserIds.map((id) => String(id)));
+
+    userIds.forEach((userId) => {
+      const normalizedUserId = String(userId);
+
+      if (excluded.has(normalizedUserId)) {
+        return;
+      }
+
+      emitToUser(normalizedUserId, eventName, payload);
+    });
   };
 
   const disconnect = (socket) => {
@@ -114,6 +124,39 @@ const setupSocket = (server) => {
     }
   };
 
+  const setActiveInvite = (callId, payload) => {
+    activeCallInvites.set(callId, {
+      ...payload,
+      invitedUserIds: new Set((payload.invitedUserIds || []).map((id) => String(id))),
+    });
+  };
+
+  const removeInviteeFromCall = (callId, userId) => {
+    const invite = activeCallInvites.get(callId);
+    if (!invite || !userId) return invite || null;
+
+    invite.invitedUserIds.delete(String(userId));
+
+    if (!invite.invitedUserIds.size && invite.chatType === "contact") {
+      activeCallInvites.delete(callId);
+      return null;
+    }
+
+    return invite;
+  };
+
+  const getRoomParticipantSocketIds = (callId) => {
+    const roomName = getCallRoomName(callId);
+    return Array.from(io.sockets.adapter.rooms.get(roomName) || []);
+  };
+
+  const getRoomParticipantUserIds = (callId) => {
+    return getRoomParticipantSocketIds(callId)
+      .map((socketId) => io.sockets.sockets.get(socketId)?.data?.userId)
+      .filter(Boolean)
+      .map((userId) => String(userId));
+  };
+
   const leaveSpecificCallRoom = (socket, callId) => {
     if (!callId) {
       return;
@@ -121,22 +164,13 @@ const setupSocket = (server) => {
 
     const roomName = getCallRoomName(callId);
 
-    if (!socket.rooms.has(roomName)) {
-      return;
+    if (socket.rooms.has(roomName)) {
+      socket.leave(roomName);
     }
 
-    const otherClients = Array.from(io.sockets.adapter.rooms.get(roomName) || []).filter(
-      (clientID) => clientID !== socket.id
-    );
-
-    otherClients.forEach((clientID) => {
-      io.to(clientID).emit(CALL_EVENTS.REMOVE_PEER, {
-        peerID: socket.id,
-        peerUser: socket.data.callUser || null,
-      });
-    });
-
-    socket.leave(roomName);
+    if (socket.data.currentCallId === callId) {
+      socket.data.currentCallId = null;
+    }
   };
 
   const leaveAllCallRooms = (socket) => {
@@ -151,6 +185,19 @@ const setupSocket = (server) => {
   const callUser = async (payload) => {
     const { callId, mode, fromUser, targetUserId } = payload;
 
+    if (!callId || !targetUserId) {
+      return;
+    }
+
+    setActiveInvite(callId, {
+      callId,
+      chatType: "contact",
+      initiatorUserId: String(fromUser?._id || ""),
+      invitedUserIds: [String(targetUserId)],
+      channelId: null,
+      channel: null,
+    });
+
     emitToUser(targetUserId, "incoming-call", {
       callId,
       mode,
@@ -162,6 +209,10 @@ const setupSocket = (server) => {
 
   const callChannel = async (payload) => {
     const { callId, mode, fromUser, channelId } = payload;
+
+    if (!callId || !channelId) {
+      return;
+    }
 
     const channel = await Channel.findById(channelId)
       .populate("members", "email firstName lastName image color")
@@ -190,6 +241,18 @@ const setupSocket = (server) => {
       }
     }
 
+    setActiveInvite(callId, {
+      callId,
+      chatType: "channel",
+      initiatorUserId: inviterId,
+      invitedUserIds: Array.from(recipients.keys()),
+      channelId: channel._id.toString(),
+      channel: {
+        _id: channel._id.toString(),
+        name: channel.name,
+      },
+    });
+
     recipients.forEach((_, recipientId) => {
       emitToUser(recipientId, "incoming-call", {
         callId,
@@ -209,6 +272,16 @@ const setupSocket = (server) => {
   const acceptCall = async (payload) => {
     const { callId, mode, chatType, toUserId, fromUser, channelId, channel } = payload;
 
+    if (!callId || !toUserId) {
+      return;
+    }
+
+    const invite = removeInviteeFromCall(callId, fromUser?._id);
+
+    if (chatType === "contact" && !invite) {
+      activeCallInvites.delete(callId);
+    }
+
     emitToUser(toUserId, "call-accepted", {
       callId,
       mode,
@@ -222,6 +295,12 @@ const setupSocket = (server) => {
   const rejectCall = async (payload) => {
     const { callId, mode, chatType, toUserId, fromUser, channelId, channel } = payload;
 
+    if (!callId || !toUserId) {
+      return;
+    }
+
+    const invite = removeInviteeFromCall(callId, fromUser?._id);
+
     emitToUser(toUserId, "call-rejected", {
       callId,
       mode,
@@ -231,15 +310,35 @@ const setupSocket = (server) => {
       channel: channel || null,
     });
 
-    emitToUser(toUserId, "call-ended", {
-      callId,
-      fromUserId: fromUser?._id || null,
-      reason: "rejected",
-    });
+    if (chatType === "contact") {
+      emitToUser(toUserId, "call-ended", {
+        callId,
+        fromUserId: fromUser?._id || null,
+        reason: "rejected",
+      });
+
+      activeCallInvites.delete(callId);
+      return;
+    }
+
+    const roomParticipants = getRoomParticipantUserIds(callId);
+    const roomHasOtherPeople = roomParticipants.some(
+      (userId) => String(userId) !== String(toUserId)
+    );
+
+    if (invite && !invite.invitedUserIds.size && !roomHasOtherPeople) {
+      emitToUser(toUserId, "call-ended", {
+        callId,
+        fromUserId: fromUser?._id || null,
+        reason: "missed",
+      });
+
+      activeCallInvites.delete(callId);
+    }
   };
 
   const joinCallRoom = (socket, payload) => {
-    const { callId, user } = payload || {};
+    const { callId } = payload || {};
 
     if (!callId) {
       return;
@@ -247,30 +346,11 @@ const setupSocket = (server) => {
 
     const roomName = getCallRoomName(callId);
 
-    if (socket.rooms.has(roomName)) {
-      return;
+    if (!socket.rooms.has(roomName)) {
+      socket.join(roomName);
     }
 
-    socket.data.callUser = user || null;
-
-    const existingClients = Array.from(io.sockets.adapter.rooms.get(roomName) || []);
-    socket.join(roomName);
-
-    existingClients.forEach((clientID) => {
-      const peerSocket = io.sockets.sockets.get(clientID);
-
-      io.to(clientID).emit(CALL_EVENTS.ADD_PEER, {
-        peerID: socket.id,
-        createOffer: false,
-        peerUser: socket.data.callUser || null,
-      });
-
-      socket.emit(CALL_EVENTS.ADD_PEER, {
-        peerID: clientID,
-        createOffer: true,
-        peerUser: peerSocket?.data?.callUser || null,
-      });
-    });
+    socket.data.currentCallId = callId;
   };
 
   const leaveCallRoom = (socket, payload) => {
@@ -284,36 +364,6 @@ const setupSocket = (server) => {
     leaveAllCallRooms(socket);
   };
 
-  const relaySessionDescription = (socket, payload) => {
-    const { callId, peerID, sessionDescription } = payload || {};
-
-    if (!peerID || !sessionDescription) {
-      return;
-    }
-
-    io.to(peerID).emit(CALL_EVENTS.SESSION_DESCRIPTION, {
-      callId,
-      peerID: socket.id,
-      sessionDescription,
-      peerUser: socket.data.callUser || null,
-    });
-  };
-
-  const relayIceCandidate = (socket, payload) => {
-    const { callId, peerID, iceCandidate } = payload || {};
-
-    if (!peerID || !iceCandidate) {
-      return;
-    }
-
-    io.to(peerID).emit(CALL_EVENTS.ICE_CANDIDATE, {
-      callId,
-      peerID: socket.id,
-      iceCandidate,
-      peerUser: socket.data.callUser || null,
-    });
-  };
-
   const endCall = (socket, payload) => {
     const { callId, toUserId } = payload || {};
 
@@ -321,23 +371,37 @@ const setupSocket = (server) => {
       return;
     }
 
-    const roomName = getCallRoomName(callId);
-    const connectedPeers = Array.from(io.sockets.adapter.rooms.get(roomName) || []).filter(
-      (clientID) => clientID !== socket.id
-    );
+    const endedByUserId = socket.data.userId ? String(socket.data.userId) : null;
+    const roomUserIds = getRoomParticipantUserIds(callId);
+    const invite = activeCallInvites.get(callId);
 
-    if (connectedPeers.length) {
-      socket.to(roomName).emit("call-ended", {
-        callId,
-        fromUserId: socket.data.userId || null,
-      });
-    } else if (toUserId) {
-      emitToUser(toUserId, "call-ended", {
-        callId,
-        fromUserId: socket.data.userId || null,
+    const recipients = new Set();
+
+    roomUserIds.forEach((userId) => {
+      if (userId && userId !== endedByUserId) {
+        recipients.add(userId);
+      }
+    });
+
+    if (invite) {
+      invite.invitedUserIds.forEach((userId) => {
+        if (userId && userId !== endedByUserId) {
+          recipients.add(userId);
+        }
       });
     }
 
+    if (toUserId && String(toUserId) !== endedByUserId) {
+      recipients.add(String(toUserId));
+    }
+
+    emitToManyUsers(recipients, "call-ended", {
+      callId,
+      fromUserId: endedByUserId,
+      reason: "ended",
+    });
+
+    activeCallInvites.delete(callId);
     leaveSpecificCallRoom(socket, callId);
   };
 
@@ -345,7 +409,7 @@ const setupSocket = (server) => {
     const userId = socket.handshake.query.userId;
 
     socket.data.userId = userId ? String(userId) : null;
-    socket.data.callUser = null;
+    socket.data.currentCallId = null;
 
     if (userId) {
       userSocketMap.set(String(userId), socket.id);
@@ -365,8 +429,6 @@ const setupSocket = (server) => {
 
     socket.on(CALL_EVENTS.JOIN_CALL_ROOM, (payload) => joinCallRoom(socket, payload));
     socket.on(CALL_EVENTS.LEAVE_CALL_ROOM, (payload) => leaveCallRoom(socket, payload));
-    socket.on(CALL_EVENTS.RELAY_SDP, (payload) => relaySessionDescription(socket, payload));
-    socket.on(CALL_EVENTS.RELAY_ICE, (payload) => relayIceCandidate(socket, payload));
 
     socket.on("disconnecting", () => {
       leaveAllCallRooms(socket);

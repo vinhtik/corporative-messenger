@@ -6,12 +6,13 @@ import {
   RoomContext,
   useTracks,
 } from "@livekit/components-react";
+import { useSocket } from "@/context/SocketContext";
 import { apiClient } from "@/lib/api-client";
 import { useAppStore } from "@/store";
 import { LIVEKIT_TOKEN_ROUTE } from "@/utils/constants";
 import { ArrowLeft, Mic, MicOff, MonitorUp, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 const CallGrid = () => {
@@ -38,13 +39,25 @@ const neutralButtonClass = `${baseButtonClass} bg-[#232531] text-white hover:bg-
 const activeButtonClass = `${baseButtonClass} bg-green-600 text-white hover:bg-green-700`;
 const dangerButtonClass = `${baseButtonClass} bg-red-600 text-white hover:bg-red-700`;
 
+const buildUserPayload = (userInfo) => ({
+  _id: userInfo.id,
+  firstName: userInfo.firstName,
+  lastName: userInfo.lastName,
+  email: userInfo.email,
+  image: userInfo.image,
+  color: userInfo.color,
+});
+
 const CallPage = () => {
   const { callId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const socket = useSocket();
   const { userInfo } = useAppStore();
 
   const chatType = searchParams.get("chatType") === "channel" ? "channel" : "contact";
+  const peerId = searchParams.get("peerId");
+  const channelId = searchParams.get("channelId");
 
   const room = useMemo(
     () =>
@@ -54,6 +67,8 @@ const CallPage = () => {
       }),
     []
   );
+
+  const isConnectedRef = useRef(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
@@ -65,6 +80,27 @@ const CallPage = () => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   useEffect(() => {
+    if (!socket || !callId) {
+      return;
+    }
+
+    const handleCallEnded = (payload) => {
+      if (payload?.callId !== callId) {
+        return;
+      }
+
+      room.disconnect();
+      navigate("/chat");
+    };
+
+    socket.on("call-ended", handleCallEnded);
+
+    return () => {
+      socket.off("call-ended", handleCallEnded);
+    };
+  }, [socket, callId, room, navigate]);
+
+  useEffect(() => {
     if (!callId) {
       setErrorText("Не передан идентификатор звонка.");
       setIsLoading(false);
@@ -73,8 +109,8 @@ const CallPage = () => {
 
     let cancelled = false;
 
-    const updateParticipantsCount = () => {
-      setParticipantsCount(room.remoteParticipants.size + (isConnected ? 1 : 0));
+    const updateParticipantsCount = (connectedValue = isConnectedRef.current) => {
+      setParticipantsCount(room.remoteParticipants.size + (connectedValue ? 1 : 0));
     };
 
     const connectToRoom = async () => {
@@ -126,11 +162,17 @@ const CallPage = () => {
           return;
         }
 
+        socket?.emit("join-call-room", {
+          callId,
+          user: buildUserPayload(userInfo),
+        });
+
+        isConnectedRef.current = true;
         setIsConnected(true);
         setIsMicEnabled(true);
         setIsCameraEnabled(true);
         setIsLoading(false);
-        updateParticipantsCount();
+        updateParticipantsCount(true);
       } catch (err) {
         console.log(err);
         setErrorText("Не удалось подключиться к звонку.");
@@ -139,21 +181,23 @@ const CallPage = () => {
     };
 
     const handleConnected = () => {
+      isConnectedRef.current = true;
       setIsConnected(true);
-      updateParticipantsCount();
+      updateParticipantsCount(true);
     };
 
     const handleDisconnected = () => {
+      isConnectedRef.current = false;
       setIsConnected(false);
-      updateParticipantsCount();
+      updateParticipantsCount(false);
     };
 
     const handleParticipantConnected = () => {
-      updateParticipantsCount();
+      updateParticipantsCount(true);
     };
 
     const handleParticipantDisconnected = () => {
-      updateParticipantsCount();
+      updateParticipantsCount(true);
     };
 
     room.on(RoomEvent.Connected, handleConnected);
@@ -166,6 +210,8 @@ const CallPage = () => {
     return () => {
       cancelled = true;
 
+      socket?.emit("leave-call-room", { callId });
+
       room.off(RoomEvent.Connected, handleConnected);
       room.off(RoomEvent.Disconnected, handleDisconnected);
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
@@ -173,7 +219,7 @@ const CallPage = () => {
 
       room.disconnect();
     };
-  }, [callId, room, userInfo, chatType, isConnected]);
+  }, [callId, room, userInfo, chatType, socket]);
 
   const toggleMicrophone = async () => {
     try {
@@ -206,6 +252,13 @@ const CallPage = () => {
   };
 
   const endCall = () => {
+    socket?.emit("end-call", {
+      callId,
+      toUserId: peerId || null,
+      channelId: channelId || null,
+      chatType,
+    });
+
     room.disconnect();
     navigate("/chat");
   };
@@ -223,7 +276,9 @@ const CallPage = () => {
       <div className="h-screen w-full bg-[#1c1d25] text-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-2xl font-semibold mb-3">Подключение к звонку...</p>
-          <p className="text-sm text-neutral-400">Поднимается комната и публикуются медиа-треки.</p>
+          <p className="text-sm text-neutral-400">
+            Поднимается комната и публикуются медиа-треки.
+          </p>
         </div>
       </div>
     );
@@ -296,11 +351,7 @@ const CallPage = () => {
             className={isCameraEnabled ? activeButtonClass : neutralButtonClass}
             title={isCameraEnabled ? "Выключить камеру" : "Включить камеру"}
           >
-            {isCameraEnabled ? (
-              <Video className="h-5 w-5" />
-            ) : (
-              <VideoOff className="h-5 w-5" />
-            )}
+            {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
           </button>
 
           <button

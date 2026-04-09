@@ -95,6 +95,15 @@ export const SocketProvider = ({ children }) => {
         .join(" ")
         .trim();
 
+      if (callData?.chatType === "channel") {
+        toast.info(
+          rejectedByName
+            ? `${rejectedByName} не присоединился к звонку`
+            : "Пользователь не присоединился к звонку"
+        );
+        return;
+      }
+
       toast.info(
         rejectedByName
           ? `${rejectedByName} отклонил звонок`
@@ -109,8 +118,17 @@ export const SocketProvider = ({ children }) => {
         clearIncomingCall();
       }
 
+      if (String(callData?.fromUserId || "") === String(userInfo?.id || "")) {
+        return;
+      }
+
       if (callData?.reason === "rejected") {
         toast.info("Звонок был отклонён.");
+        return;
+      }
+
+      if (callData?.reason === "missed") {
+        toast.info("Никто не присоединился к звонку.");
         return;
       }
 
