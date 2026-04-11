@@ -284,8 +284,8 @@ const CallPage = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [participantsCount, setParticipantsCount] = useState(1);
 
-  const [isMicEnabled, setIsMicEnabled] = useState(true);
-  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [isMicEnabled, setIsMicEnabled] = useState(false);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const clearAutoEndTimer = useCallback(() => {
@@ -296,7 +296,7 @@ const CallPage = () => {
   }, []);
 
   const performLeave = useCallback(
-    (notifyServer = true) => {
+    async (notifyServer = true) => {
       clearAutoEndTimer();
 
       if (notifyServer) {
@@ -309,6 +309,16 @@ const CallPage = () => {
       }
 
       socket?.emit("leave-call-room", { callId });
+
+      try {
+        await Promise.allSettled([
+          room.localParticipant.setScreenShareEnabled(false),
+          room.localParticipant.setCameraEnabled(false),
+          room.localParticipant.setMicrophoneEnabled(false),
+        ])
+      } catch (err){
+        console.log(err)
+      }
       room.disconnect();
       navigate("/chat");
     },
@@ -405,9 +415,6 @@ const CallPage = () => {
           autoSubscribe: true,
         });
 
-        await room.localParticipant.setMicrophoneEnabled(true);
-        await room.localParticipant.setCameraEnabled(true);
-
         if (cancelled) {
           room.disconnect();
           return;
@@ -420,10 +427,11 @@ const CallPage = () => {
 
         isConnectedRef.current = true;
         setIsConnected(true);
-        setIsMicEnabled(true);
-        setIsCameraEnabled(true);
         setIsLoading(false);
+        setIsMicEnabled(false);
+        setIsCameraEnabled(false);
         syncRemoteParticipantState(true);
+
       } catch (err) {
         console.log(err);
         setErrorText("Не удалось подключиться к звонку.");

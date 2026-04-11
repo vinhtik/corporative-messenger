@@ -23,6 +23,7 @@ const MessageBar = () => {
 
   const [message, setMessage] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const isMobile = window.innerWidth < 640;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -170,6 +171,8 @@ const MessageBar = () => {
                 open={emojiPickerOpen}
                 onEmojiClick={handleAddEmoji}
                 autoFocusSearch={false}
+                width={isMobile ? 280 : 350}
+                height={isMobile ? 350 : 450}
               />
             </div>
           )}

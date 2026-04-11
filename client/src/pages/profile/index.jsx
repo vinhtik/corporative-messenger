@@ -129,19 +129,30 @@ const handleDeleteImage = async () => {
                   }
                 </div>
               )}
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileInputChange} name="profile-image" accept=".png, .jpg, .jpeg, .svg, .webp" />
+              <button
+              type="button"
+              onClick={image ? handleDeleteImage : handleFileInputClick}
+              className="md:hidden absolute bottom-1 right-1 z-20 h-10 w-10 rounded-full bg-black/70 flex items-center justify-center"
+              >
+                {image ? (
+                  <FaTrash className="text-white text-base" />
+                ) : (
+                  <FaPlus className="text-white text-base" />
+                )}
+              </button>
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileInputChange} name="profile-image" accept=".png, .jpg, .jpeg, .svg, .webp .gif" />
           </div>
           <div className="flex min-w-32 md:min-w-64 flex-col gap-5 text-white items-center justify-center">
             <div className="w-full">
               <Input placeholder="Email" type="email" disabled value={userInfo.email} className="rounded-lg p-6 bg-[#2c2e3b] border-none" />
             </div>
             <div className="w-full">
-              <Input placeholder="First Name" type="text" onChange= {
+              <Input placeholder="First Name" maxLength={67} type="text" onChange= {
                 e => setFirstName(e.target.value)
               } value={firstName} className="rounded-lg p-6 bg-[#2c2e3b] border-none" />
             </div>
             <div className="w-full">
-              <Input placeholder="Last Name" type="text" value={lastName} 
+              <Input placeholder="Last Name" type="text" maxLength={67} value={lastName} 
               onChange = {(e) => setLastName(e.target.value)} className="rounded-lg p-6 bg-[#2c2e3b] border-none" />
             </div>
             <div className="w-full flex gap-5">

@@ -222,7 +222,8 @@ const MessageContainer = () => {
                   setImageURL(message.fileUrl);
                 }}
               >
-                <img src={`${HOST}/${message.fileUrl}`} height={300} width={300} alt="Preview" />
+                <img src={`${HOST}/${message.fileUrl}`} height={300} width={300} alt="Preview"
+                className="w-auto h-auto max-h-[300px] object-contain" />
               </div>
             ) : (
               <div className="flex items-center justify-center gap-4">
@@ -290,7 +291,7 @@ const MessageContainer = () => {
           <div>
             <img
               src={`${HOST}/${imageURL}`}
-              className="h-[80vh] w-full bg-cover"
+              className="max-h-[80vh] max-w-[95vw] object-contain bg-cover"
             />
           </div>
 

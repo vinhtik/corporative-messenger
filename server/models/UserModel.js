@@ -9,15 +9,18 @@ const userSchema = new mongoose.Schema({
     },
     password:{
         type: String,
-        required: [true, "Пароль обязателен"]
+        required: [true, "Пароль обязателен"],
+        maxLength: 67
     },
     firstName:{
         type: String,
         required: false,
+        maxLength: 67
     },
     lastName:{
         type: String,
         required: false,
+        maxLength: 67
     },
     image:{
         type: String,
