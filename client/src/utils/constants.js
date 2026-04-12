@@ -31,3 +31,8 @@ export const DELETE_CHANNEL_ROUTE = `${CHANNEL_ROUTES}/delete-channel`;
 
 export const CALLS_ROUTES = "api/calls";
 export const LIVEKIT_TOKEN_ROUTE = `${CALLS_ROUTES}/livekit-token`;
+
+export const GET_PROFILE_PHOTOS_ROUTE = `${AUTH_ROUTES}/profile-photos`;
+export const ADD_PROFILE_PHOTO_ROUTE = `${AUTH_ROUTES}/profile-photos`;
+export const SET_AVATAR_PHOTO_ROUTE = `${AUTH_ROUTES}/profile-photos`;
+export const CONTACT_PROFILE_ROUTE = `${CONTACTS_ROUTES}/profile`;

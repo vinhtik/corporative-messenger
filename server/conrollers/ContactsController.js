@@ -21,7 +21,7 @@ export const searchContacts = async (request, response, next) => {
             $and:[
                 { _id:{ $ne: request.userId }},
                 {
-                    $or:[{ firstName: regex }, { lastName: regex }, { email: regex }]
+                    $or:[{ firstName: regex }, { lastName: regex }]
                 },
             ],
         });
@@ -32,6 +32,26 @@ export const searchContacts = async (request, response, next) => {
         return response.status(500).send("Internal Server Error")
     }
 };
+
+export const getContactProfile = async (request, response) => {
+  try {
+    const { userId } = request.params;
+
+    const user = await User.findById(userId).select(
+      "email firstName lastName image color profilePhotos"
+    );
+
+    if (!user) {
+      return response.status(404).send("User not found");
+    }
+
+    return response.status(200).json({ user });
+  } catch (err) {
+    console.log({ err });
+    return response.status(500).send("Internal Server Error");
+  }
+};
+
 
 export const getContactsForDMList = async (request, response, next) => {
     try{

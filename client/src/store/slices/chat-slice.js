@@ -19,6 +19,17 @@ export const createChatSlice = (set, get) => ({
     setSelectedChatMessages: (selectedChatMessages) => set({ selectedChatMessages }),
     setDirectMessagesContacts: (directMessagesContacts) => set({ directMessagesContacts }),
 
+    profileViewerOpen: false,
+    profileViewerUser: null,
+
+    setProfileViewerOpen: (profileViewerOpen) => set({ profileViewerOpen }),
+    setProfileViewerUser: (profileViewerUser) => set({ profileViewerUser }),
+    openProfileViewer: (profileViewerUser) =>
+        set({ profileViewerOpen: true, profileViewerUser }),
+    closeProfileViewer: () =>
+        set({ profileViewerOpen: false, profileViewerUser: null }),
+
+
     addChannel: (channel) => {
         const channels = get().channels;
         set({ channels: [channel, ...channels] });

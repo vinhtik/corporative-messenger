@@ -100,7 +100,7 @@ const selectNewContact = (contact) => {
                             className="object-cover w-full h-full bg-black" />
                         ) : ( 
                             <div className={`uppercase h-12 w-12 text-lg border-[0.1rem] flex items-center justify-center rounded-full ${getColor(contact.color)}`}>
-                            {contact.firstName ? contact.firstName.split("").shift() : contact.email.split("").shift() }
+                            {contact.firstName.split("").shift() }
                             </div>
                             )
                         }
@@ -108,9 +108,8 @@ const selectNewContact = (contact) => {
                     </div>
                     <div className="flex flex-col">
                         <span>
-                        { contact.firstName && contact.lastName ? `${contact.firstName} ${contact.lastName}` : contact.email }
+                        { `${contact.firstName} ${contact.lastName}`}
                         </span>
-                        <span className="text-xs">{ contact.email }</span>
                     </div>
 
                 </div>)
