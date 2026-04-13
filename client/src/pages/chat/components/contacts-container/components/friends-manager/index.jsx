@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { FaUserPlus } from "react-icons/fa";
 import { toast } from "sonner";
 
@@ -23,14 +23,16 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { apiClient } from "@/lib/api-client";
 import { getColor } from "@/lib/utils";
 import { useAppStore } from "@/store";
+import UserProfileDialog from "@/components/profile/user-profile-dialog";
 import {
   ACCEPT_FRIEND_REQUEST_ROUTE,
+  CANCEL_FRIEND_REQUEST_ROUTE,
+  CONTACT_PROFILE_ROUTE,
   GET_FRIENDS_LIST_ROUTE,
   GET_INCOMING_FRIEND_REQUESTS_ROUTE,
   GET_OUTGOING_FRIEND_REQUESTS_ROUTE,
   HOST,
   REJECT_FRIEND_REQUEST_ROUTE,
-  CANCEL_FRIEND_REQUEST_ROUTE,
   REMOVE_FRIEND_ROUTE,
   SEARCH_USERS_FOR_FRIENDSHIP_ROUTE,
   SEND_FRIEND_REQUEST_ROUTE,
@@ -60,16 +62,13 @@ const FriendsManager = () => {
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
-  const requestIdsSet = useMemo(() => {
-    return new Set([
-      ...incomingRequests.map((item) => String(item._id)),
-      ...outgoingRequests.map((item) => String(item._id)),
-    ]);
-  }, [incomingRequests, outgoingRequests]);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
 
   const loadFriends = async () => {
     try {
       setIsLoadingFriends(true);
+
       const response = await apiClient.get(GET_FRIENDS_LIST_ROUTE, {
         withCredentials: true,
       });
@@ -108,10 +107,9 @@ const FriendsManager = () => {
 
   const searchUsers = async (value) => {
     try {
-      const nextValue = value;
-      setSearchTerm(nextValue);
+      setSearchTerm(value);
 
-      if (!nextValue.trim()) {
+      if (!value.trim()) {
         setSearchedUsers([]);
         return;
       }
@@ -120,7 +118,7 @@ const FriendsManager = () => {
 
       const response = await apiClient.post(
         SEARCH_USERS_FOR_FRIENDSHIP_ROUTE,
-        { searchTerm: nextValue },
+        { searchTerm: value },
         { withCredentials: true }
       );
 
@@ -209,23 +207,22 @@ const FriendsManager = () => {
   };
 
   const cancelOutgoingFriendRequest = async (requestId) => {
-  try {
-    setBusyId(String(requestId));
+    try {
+      setBusyId(String(requestId));
 
-    await apiClient.delete(`${CANCEL_FRIEND_REQUEST_ROUTE}/${requestId}`, {
-      withCredentials: true,
-    });
+      await apiClient.delete(`${CANCEL_FRIEND_REQUEST_ROUTE}/${requestId}`, {
+        withCredentials: true,
+      });
 
-    toast.success("Заявка отменена");
-    await refreshAll();
-  } catch (error) {
-    console.log(error);
-    toast.error(error?.response?.data || "Не удалось отменить заявку");
-  } finally {
-    setBusyId(null);
-  }
-};
-
+      toast.success("Заявка отменена");
+      await refreshAll();
+    } catch (error) {
+      console.log(error);
+      toast.error(error?.response?.data || "Не удалось отменить заявку");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const removeFriend = async (friendId) => {
     try {
@@ -245,10 +242,45 @@ const FriendsManager = () => {
     }
   };
 
-  const openDialogWithFriend = (friend) => {
+  const openChatWithUser = (user) => {
+    if (!user?._id) return;
+
+    setProfileOpen(false);
     setOpen(false);
     setSelectedChatType("contact");
-    setSelectedChatData(friend);
+    setSelectedChatData(user);
+  };
+
+  const openUserProfile = async (user, fallbackUser = null) => {
+    const userId = user?._id || fallbackUser?._id;
+
+    if (!userId) return;
+
+    try {
+      const response = await apiClient.get(`${CONTACT_PROFILE_ROUTE}/${userId}`, {
+        withCredentials: true,
+      });
+
+      if (response.data?.user) {
+        setProfileUser(response.data.user);
+        setProfileOpen(true);
+        return;
+      }
+
+      if (fallbackUser || user) {
+        setProfileUser(fallbackUser || user);
+        setProfileOpen(true);
+      }
+    } catch (error) {
+      console.log(error);
+
+      if (fallbackUser || user) {
+        setProfileUser(fallbackUser || user);
+        setProfileOpen(true);
+      } else {
+        toast.error("Не удалось открыть профиль");
+      }
+    }
   };
 
   const renderAvatar = (user) => {
@@ -286,7 +318,7 @@ const FriendsManager = () => {
 
     if (user.friendshipStatus === "friend") {
       return (
-        <span className="block w-full md:w-auto text-center text-xs text-green-400 bg-green-500/10 px-3 py-2 rounded-md">
+        <span className="block w-full sm:w-auto text-center text-xs text-green-400 bg-green-500/10 px-3 py-2 rounded-md">
           Уже в друзьях
         </span>
       );
@@ -294,7 +326,7 @@ const FriendsManager = () => {
 
     if (user.friendshipStatus === "outgoing_request") {
       return (
-        <span className="block w-full md:w-auto text-center text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-md">
+        <span className="block w-full sm:w-auto text-center text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-md">
           Заявка отправлена
         </span>
       );
@@ -302,7 +334,7 @@ const FriendsManager = () => {
 
     if (user.friendshipStatus === "incoming_request") {
       return (
-        <span className="block w-full md:w-auto text-center text-xs text-blue-400 bg-blue-500/10 px-3 py-2 rounded-md">
+        <span className="block w-full sm:w-auto text-center text-xs text-blue-400 bg-blue-500/10 px-3 py-2 rounded-md">
           Входящая заявка
         </span>
       );
@@ -311,7 +343,7 @@ const FriendsManager = () => {
     return (
       <Button
         size="sm"
-        className="w-full md:w-auto bg-green-700 hover:bg-green-900"
+        className="w-full sm:w-auto bg-green-700 hover:bg-green-900"
         disabled={isBusy}
         onClick={() => sendFriendRequest(user._id)}
       >
@@ -337,7 +369,7 @@ const FriendsManager = () => {
       </TooltipProvider>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-[#181920] border-none text-white w-[95vw] md:w-[600px] max-w-[95vw] h-[92vh] md:h-[650px] flex flex-col">
+        <DialogContent className="bg-[#181920] border-none text-white w-[95vw] sm:w-[600px] max-w-[95vw] h-[92vh] sm:h-[650px] flex flex-col">
           <DialogHeader>
             <DialogTitle>Друзья</DialogTitle>
             <DialogDescription className="text-white/50">
@@ -406,20 +438,26 @@ const FriendsManager = () => {
                     return (
                       <div
                         key={friend._id}
-                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3"
+                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                       >
-                        <div className="flex items-center gap-3 min-w-0 w-full">
+                        <button
+                          type="button"
+                          className="flex items-center gap-3 min-w-0 w-full text-left"
+                          onClick={() => openUserProfile(friend, friend)}
+                        >
                           {renderAvatar(friend)}
                           <div className="min-w-0 flex-1">
-                            <div className="truncate">{renderUserMainText(friend)}</div>
+                            <div className="truncate text-sm sm:text-base">
+                              {renderUserMainText(friend)}
+                            </div>
                           </div>
-                        </div>
+                        </button>
 
-                        <div className="flex items-center w-full md:w-auto gap-2 shrink-0">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                           <Button
                             size="sm"
-                            className="bg-green-700 hover:bg-green-900"
-                            onClick={() => openDialogWithFriend(friend)}
+                            className="w-full sm:w-auto bg-green-700 hover:bg-green-900"
+                            onClick={() => openChatWithUser(friend)}
                           >
                             Написать
                           </Button>
@@ -427,7 +465,7 @@ const FriendsManager = () => {
                           <Button
                             size="sm"
                             variant="destructive"
-                            className="bg-red-700 hover:bg-red-900"
+                            className="w-full sm:w-auto bg-red-700 hover:bg-red-900"
                             disabled={isBusy}
                             onClick={() => removeFriend(friend._id)}
                           >
@@ -461,21 +499,25 @@ const FriendsManager = () => {
                     return (
                       <div
                         key={item._id}
-                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                       >
-                        <div className="flex items-center gap-3 min-w-0 w-full">
+                        <button
+                          type="button"
+                          className="flex items-center gap-3 min-w-0 w-full text-left"
+                          onClick={() => openUserProfile(requester, requester)}
+                        >
                           {renderAvatar(requester)}
-                          <div className="min-w-0">
-                            <div className="truncate">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm sm:text-base">
                               {renderUserMainText(requester)}
                             </div>
                           </div>
-                        </div>
+                        </button>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                           <Button
                             size="sm"
-                            className="bg-green-700 hover:bg-green-900"
+                            className="w-full sm:w-auto bg-green-700 hover:bg-green-900"
                             disabled={isBusy}
                             onClick={() => acceptFriendRequest(item._id)}
                           >
@@ -485,7 +527,7 @@ const FriendsManager = () => {
                           <Button
                             size="sm"
                             variant="destructive"
-                            className="bg-red-700 hover:bg-red-900"
+                            className="w-full sm:w-auto bg-red-700 hover:bg-red-900"
                             disabled={isBusy}
                             onClick={() => rejectFriendRequest(item._id)}
                           >
@@ -510,34 +552,41 @@ const FriendsManager = () => {
 
                   {outgoingRequests.map((item) => {
                     const recipient = item.recipient;
-                    const isBusy = busyId === String(item._id)
+                    const isBusy = busyId === String(item._id);
 
                     return (
                       <div
                         key={item._id}
-                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                       >
-                        <div className="flex items-center gap-3 min-w-0 w-full">
+                        <button
+                          type="button"
+                          className="flex items-center gap-3 min-w-0 w-full text-left"
+                          onClick={() => openUserProfile(recipient, recipient)}
+                        >
                           {renderAvatar(recipient)}
-                          <div className="min-w-0">
-                            <div className="truncate">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm sm:text-base">
                               {renderUserMainText(recipient)}
                             </div>
                           </div>
-                        </div>
+                        </button>
 
-                        <div className="w-full md:w-auto text-center shrink-0 text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-md">
-                          Ожидает ответа
-                        </div>
-                        <Button 
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
+                          <div className="w-full sm:w-auto text-center text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-md">
+                            Ожидает ответа
+                          </div>
+
+                          <Button
                             size="sm"
                             variant="destructive"
-                            className="w-full md:w-auto bg-red-700 hover:bg-red-900"
+                            className="w-full sm:w-auto bg-red-700 hover:bg-red-900"
                             disabled={isBusy}
                             onClick={() => cancelOutgoingFriendRequest(item._id)}
-                        >
+                          >
                             Отменить
-                        </Button>
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}
@@ -561,7 +610,7 @@ const FriendsManager = () => {
                 <div className="flex flex-col gap-3">
                   {!searchTerm.trim() && (
                     <div className="text-white/50 text-sm text-center py-10">
-                      Введите имя
+                      Введите имя, фамилию
                     </div>
                   )}
 
@@ -576,16 +625,22 @@ const FriendsManager = () => {
                   {searchedUsers.map((user) => (
                     <div
                       key={user._id}
-                      className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                      className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                     >
-                      <div className="flex items-center gap-3 min-w-0 w-full">
+                      <button
+                        type="button"
+                        className="flex items-center gap-3 min-w-0 w-full text-left"
+                        onClick={() => openUserProfile(user, user)}
+                      >
                         {renderAvatar(user)}
-                        <div className="min-w-0">
-                          <div className="truncate">{renderUserMainText(user)}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm sm:text-base">
+                            {renderUserMainText(user)}
+                          </div>
                         </div>
-                      </div>
+                      </button>
 
-                      <div className="shrink-0 w-full md:w-auto">
+                      <div className="w-full sm:w-auto shrink-0">
                         {renderSearchAction(user)}
                       </div>
                     </div>
@@ -596,6 +651,13 @@ const FriendsManager = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <UserProfileDialog
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        user={profileUser}
+        onMessage={openChatWithUser}
+      />
     </>
   );
 };
