@@ -44,11 +44,17 @@ const TABS = {
   SEARCH: "search",
 };
 
+const REQUEST_TABS = {
+  INCOMING: "incoming",
+  OUTGOING: "outgoing",
+};
+
 const FriendsManager = () => {
   const { setSelectedChatType, setSelectedChatData } = useAppStore();
 
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(TABS.FRIENDS);
+  const [activeRequestsTab, setActiveRequestsTab] = useState(REQUEST_TABS.INCOMING);
 
   const [friends, setFriends] = useState([]);
   const [incomingRequests, setIncomingRequests] = useState([]);
@@ -482,116 +488,152 @@ const FriendsManager = () => {
 
           {activeTab === TABS.REQUESTS && (
             <div className="flex-1 min-h-0 rounded-xl bg-[#232531] p-4">
-              <div className="text-sm text-white/60 mb-3">Входящие заявки</div>
-
-              <ScrollArea className="h-[215px] pr-3">
-                <div className="flex flex-col gap-3">
-                  {!isLoadingRequests && incomingRequests.length === 0 && (
-                    <div className="text-white/50 text-sm text-center py-6">
-                      Входящих заявок нет
-                    </div>
+              <div className="flex gap-2 bg-[#1b1c24] p-1 rounded-xl mb-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveRequestsTab(REQUEST_TABS.INCOMING)}
+                  className={`flex-1 rounded-lg py-2 text-sm transition-all ${
+                    activeRequestsTab === REQUEST_TABS.INCOMING
+                      ? "bg-green-700 text-white"
+                      : "text-white/65 hover:bg-white/5"
+                  }`}
+                >
+                  Входящие
+                  {!!incomingRequests.length && (
+                    <span className="ml-2 text-xs bg-white/15 px-2 py-1 rounded-full">
+                      {incomingRequests.length}
+                    </span>
                   )}
+                </button>
 
-                  {incomingRequests.map((item) => {
-                    const requester = item.requester;
-                    const isBusy = busyId === String(item._id);
-
-                    return (
-                      <div
-                        key={item._id}
-                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                      >
-                        <button
-                          type="button"
-                          className="flex items-center gap-3 min-w-0 w-full text-left"
-                          onClick={() => openUserProfile(requester, requester)}
-                        >
-                          {renderAvatar(requester)}
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm sm:text-base">
-                              {renderUserMainText(requester)}
-                            </div>
-                          </div>
-                        </button>
-
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
-                          <Button
-                            size="sm"
-                            className="w-full sm:w-auto bg-green-700 hover:bg-green-900"
-                            disabled={isBusy}
-                            onClick={() => acceptFriendRequest(item._id)}
-                          >
-                            Принять
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="w-full sm:w-auto bg-red-700 hover:bg-red-900"
-                            disabled={isBusy}
-                            onClick={() => rejectFriendRequest(item._id)}
-                          >
-                            Отклонить
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-
-              <div className="text-sm text-white/60 mb-3 mt-5">Исходящие заявки</div>
-
-              <ScrollArea className="h-[170px] pr-3">
-                <div className="flex flex-col gap-3">
-                  {!isLoadingRequests && outgoingRequests.length === 0 && (
-                    <div className="text-white/50 text-sm text-center py-6">
-                      Исходящих заявок нет
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveRequestsTab(REQUEST_TABS.OUTGOING)}
+                  className={`flex-1 rounded-lg py-2 text-sm transition-all ${
+                    activeRequestsTab === REQUEST_TABS.OUTGOING
+                      ? "bg-green-700 text-white"
+                      : "text-white/65 hover:bg-white/5"
+                  }`}
+                >
+                  Исходящие
+                  {!!outgoingRequests.length && (
+                    <span className="ml-2 text-xs bg-white/15 px-2 py-1 rounded-full">
+                      {outgoingRequests.length}
+                    </span>
                   )}
+                </button>
+              </div>
 
-                  {outgoingRequests.map((item) => {
-                    const recipient = item.recipient;
-                    const isBusy = busyId === String(item._id);
-
-                    return (
-                      <div
-                        key={item._id}
-                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                      >
-                        <button
-                          type="button"
-                          className="flex items-center gap-3 min-w-0 w-full text-left"
-                          onClick={() => openUserProfile(recipient, recipient)}
-                        >
-                          {renderAvatar(recipient)}
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm sm:text-base">
-                              {renderUserMainText(recipient)}
-                            </div>
-                          </div>
-                        </button>
-
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
-                          <div className="w-full sm:w-auto text-center text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-md">
-                            Ожидает ответа
-                          </div>
-
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="w-full sm:w-auto bg-red-700 hover:bg-red-900"
-                            disabled={isBusy}
-                            onClick={() => cancelOutgoingFriendRequest(item._id)}
-                          >
-                            Отменить
-                          </Button>
-                        </div>
+              {activeRequestsTab === REQUEST_TABS.INCOMING && (
+                <ScrollArea className="h-[440px] pr-3">
+                  <div className="flex flex-col gap-3">
+                    {!isLoadingRequests && incomingRequests.length === 0 && (
+                      <div className="text-white/50 text-sm text-center py-10">
+                        Входящих заявок нет
                       </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
+                    )}
+
+                    {incomingRequests.map((item) => {
+                      const requester = item.requester;
+                      const isBusy = busyId === String(item._id);
+
+                      return (
+                        <div
+                          key={item._id}
+                          className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                        >
+                          <button
+                            type="button"
+                            className="flex items-center gap-3 min-w-0 w-full text-left"
+                            onClick={() => openUserProfile(requester, requester)}
+                          >
+                            {renderAvatar(requester)}
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm sm:text-base">
+                                {renderUserMainText(requester)}
+                              </div>
+                            </div>
+                          </button>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
+                            <Button
+                              size="sm"
+                              className="w-full sm:w-auto bg-green-700 hover:bg-green-900"
+                              disabled={isBusy}
+                              onClick={() => acceptFriendRequest(item._id)}
+                            >
+                              Принять
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="w-full sm:w-auto bg-red-700 hover:bg-red-900"
+                              disabled={isBusy}
+                              onClick={() => rejectFriendRequest(item._id)}
+                            >
+                              Отклонить
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+
+              {activeRequestsTab === REQUEST_TABS.OUTGOING && (
+                <ScrollArea className="h-[440px] pr-3">
+                  <div className="flex flex-col gap-3">
+                    {!isLoadingRequests && outgoingRequests.length === 0 && (
+                      <div className="text-white/50 text-sm text-center py-10">
+                        Исходящих заявок нет
+                      </div>
+                    )}
+
+                    {outgoingRequests.map((item) => {
+                      const recipient = item.recipient;
+                      const isBusy = busyId === String(item._id);
+
+                      return (
+                        <div
+                          key={item._id}
+                          className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                        >
+                          <button
+                            type="button"
+                            className="flex items-center gap-3 min-w-0 w-full text-left"
+                            onClick={() => openUserProfile(recipient, recipient)}
+                          >
+                            {renderAvatar(recipient)}
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm sm:text-base">
+                                {renderUserMainText(recipient)}
+                              </div>
+                            </div>
+                          </button>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
+                            <div className="w-full sm:w-auto text-center text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-md">
+                              Ожидает ответа
+                            </div>
+
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="w-full sm:w-auto bg-red-700 hover:bg-red-900"
+                              disabled={isBusy}
+                              onClick={() => cancelOutgoingFriendRequest(item._id)}
+                            >
+                              Отменить
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
             </div>
           )}
 
@@ -610,7 +652,7 @@ const FriendsManager = () => {
                 <div className="flex flex-col gap-3">
                   {!searchTerm.trim() && (
                     <div className="text-white/50 text-sm text-center py-10">
-                      Введите имя, фамилию
+                      Введите имя или фамилию
                     </div>
                   )}
 
@@ -663,3 +705,4 @@ const FriendsManager = () => {
 };
 
 export default FriendsManager;
+

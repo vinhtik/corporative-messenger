@@ -702,9 +702,6 @@ const ChatHeader = () => {
 
                         <div className="min-w-0">
                           <div className="truncate">{fullName}</div>
-                          <div className="text-xs text-white/45 truncate">
-                            {user?.email}
-                          </div>
                         </div>
                       </button>
 

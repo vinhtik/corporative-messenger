@@ -152,7 +152,6 @@ const UserProfileDialog = ({
 
               <div className="flex flex-col items-center gap-1 text-center">
                 <div className="text-2xl font-semibold break-words">{fullName}</div>
-                <div className="text-sm text-white/55 break-all">{user?.email || ""}</div>
               </div>
 
               {!isOwnProfile && (
