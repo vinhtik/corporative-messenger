@@ -90,52 +90,56 @@ const setupSocket = (server) => {
   };
 
   const sendChannelMessage = async (message) => {
-    const { channelId, sender, content, messageType, fileUrl, mimeType } = message;
+  const { channelId, sender, content, messageType, fileUrl, mimeType, duration } =
+    message;
 
-    const channel = await Channel.findById(channelId);
+  const channel = await Channel.findById(channelId);
 
-    if (!channel) {
-      return;
-    }
+  if (!channel) {
+    return;
+  }
 
-    if (!isChannelMember(channel, sender)) {
-      return;
-    }
+  if (!isChannelMember(channel, sender)) {
+    return;
+  }
 
-    const createdMessage = await Message.create({
-      sender,
-      recipient: null,
-      content,
-      messageType,
-      timestamp: new Date(),
-      fileUrl,
-      mimeType,
-    });
+  const createdMessage = await Message.create({
+    sender,
+    recipient: null,
+    content,
+    messageType,
+    timestamp: new Date(),
+    fileUrl,
+    mimeType,
+    duration,
+  });
 
-    const messageData = await Message.findById(createdMessage._id)
-      .populate("sender", "id email firstName lastName image color")
-      .exec();
+  const messageData = await Message.findById(createdMessage._id)
+    .populate("sender", "id email firstName lastName image color")
+    .exec();
 
-    const updatedChannel = await Channel.findByIdAndUpdate(
-      channelId,
-      {
-        $push: { messages: createdMessage._id },
-      },
-      { new: true }
-    );
+  const updatedChannel = await Channel.findByIdAndUpdate(
+    channelId,
+    {
+      $push: { messages: createdMessage._id },
+    },
+    { new: true }
+  );
 
-    if (!updatedChannel) {
-      return;
-    }
+  if (!updatedChannel) {
+    return;
+  }
 
-    const finalData = { ...messageData._doc, channelId: updatedChannel._id };
+  const finalData = { ...messageData._doc, channelId: updatedChannel._id };
 
-    emitToManyUsers(
-      getChannelMemberIds(updatedChannel),
-      "recieve-channel-message",
-      finalData
-    );
-  };
+  emitToManyUsers(
+    getChannelMemberIds(updatedChannel),
+    "recieve-channel-message",
+    finalData
+  );
+};
+
+
 
   const getRoomParticipantSocketIds = (callId) => {
     const roomName = getCallRoomName(callId);

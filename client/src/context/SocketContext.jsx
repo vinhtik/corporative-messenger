@@ -29,11 +29,20 @@ const isImageFile = (filePath = "") => {
 };
 
 const getMessagePreview = (message) => {
+  if (message?.messageType === "audio") {
+    return "Голосовое сообщение";
+  }
+
+  if (message?.messageType === "video-note") {
+    return "Видеосообщение";
+  }
+
   if (message?.messageType === "file") {
     if (isImageFile(message?.fileUrl)) {
-      return " Изображение";
+      return "Изображение";
     }
-    return " Файл";
+
+    return "Файл";
   }
 
   return message?.content || "Новое сообщение";

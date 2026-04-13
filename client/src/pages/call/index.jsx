@@ -8,6 +8,10 @@ import {
 } from "@livekit/components-react";
 import { useSocket } from "@/context/SocketContext";
 import { apiClient } from "@/lib/api-client";
+import {
+  registerManagedExternalOwner,
+  releaseManagedOwner,
+} from "@/lib/media-device-manager";
 import { useAppStore } from "@/store";
 import { LIVEKIT_TOKEN_ROUTE } from "@/utils/constants";
 import {
@@ -32,6 +36,8 @@ const baseButtonClass =
 const neutralButtonClass = `${baseButtonClass} bg-[#232531] text-white hover:bg-[#2d3040]`;
 const activeButtonClass = `${baseButtonClass} bg-green-600 text-white hover:bg-green-700`;
 const dangerButtonClass = `${baseButtonClass} bg-red-600 text-white hover:bg-red-700`;
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const buildUserPayload = (userInfo) => ({
   _id: userInfo.id,
@@ -61,17 +67,9 @@ const getParticipantLabel = (participant) => {
     .join(" ")
     .trim();
 
-  if (participant.name) {
-    return participant.name;
-  }
-
-  if (metadataFullName) {
-    return metadataFullName;
-  }
-
-  if (metadata.email) {
-    return metadata.email;
-  }
+  if (participant.name) return participant.name;
+  if (metadataFullName) return metadataFullName;
+  if (metadata.email) return metadata.email;
 
   return participant.identity || "Участник";
 };
@@ -83,9 +81,7 @@ const getTrackKey = (trackRef) => {
     "unknown-participant";
 
   const source =
-    trackRef?.source ||
-    trackRef?.publication?.source ||
-    "unknown-source";
+    trackRef?.source || trackRef?.publication?.source || "unknown-source";
 
   const publicationId =
     trackRef?.publication?.trackSid ||
@@ -97,6 +93,165 @@ const getTrackKey = (trackRef) => {
 
 const isScreenShareTrack = (trackRef) =>
   trackRef?.source === Track.Source.ScreenShare;
+
+const getMapValues = (value) => {
+  if (!value || typeof value.values !== "function") return [];
+  return Array.from(value.values());
+};
+
+const stopLocalTrack = (track) => {
+  try {
+    track?.stop?.();
+  } catch (error) {
+    console.log("track.stop error", error);
+  }
+
+  try {
+    track?.mediaStreamTrack?.stop?.();
+  } catch (error) {
+    console.log("mediaStreamTrack.stop error", error);
+  }
+};
+
+const getCameraPublications = (room) => {
+  const videoPublications = getMapValues(room?.localParticipant?.videoTrackPublications);
+  return videoPublications.filter(
+    (publication) => publication?.source === Track.Source.Camera
+  );
+};
+
+const getMicrophonePublications = (room) => {
+  return getMapValues(room?.localParticipant?.audioTrackPublications);
+};
+
+const getScreenSharePublications = (room) => {
+  const videoPublications = getMapValues(room?.localParticipant?.videoTrackPublications);
+  return videoPublications.filter(
+    (publication) => publication?.source === Track.Source.ScreenShare
+  );
+};
+
+const forceReleaseCamera = async (room) => {
+  const localParticipant = room?.localParticipant;
+  if (!localParticipant) return;
+
+  try {
+    await localParticipant.setCameraEnabled(false);
+  } catch (error) {
+    console.log("setCameraEnabled(false) error", error);
+  }
+
+  const cameraPublications = getCameraPublications(room);
+
+  for (const publication of cameraPublications) {
+    const track = publication?.track;
+    if (!track) continue;
+
+    try {
+      localParticipant.unpublishTrack?.(track, true);
+    } catch (error) {
+      console.log("unpublishTrack(camera) error", error);
+    }
+
+    stopLocalTrack(track);
+  }
+
+  await wait(600);
+};
+
+const forceReleaseMicrophone = async (room) => {
+  const localParticipant = room?.localParticipant;
+  if (!localParticipant) return;
+
+  try {
+    await localParticipant.setMicrophoneEnabled(false);
+  } catch (error) {
+    console.log("setMicrophoneEnabled(false) error", error);
+  }
+
+  const microphonePublications = getMicrophonePublications(room);
+
+  for (const publication of microphonePublications) {
+    const track = publication?.track;
+    if (!track) continue;
+
+    try {
+      localParticipant.unpublishTrack?.(track, true);
+    } catch (error) {
+      console.log("unpublishTrack(microphone) error", error);
+    }
+
+    stopLocalTrack(track);
+  }
+
+  await wait(300);
+};
+
+const forceReleaseScreenShare = async (room) => {
+  const localParticipant = room?.localParticipant;
+  if (!localParticipant) return;
+
+  try {
+    await localParticipant.setScreenShareEnabled(false);
+  } catch (error) {
+    console.log("setScreenShareEnabled(false) error", error);
+  }
+
+  const screenSharePublications = getScreenSharePublications(room);
+
+  for (const publication of screenSharePublications) {
+    const track = publication?.track;
+    if (!track) continue;
+
+    try {
+      localParticipant.unpublishTrack?.(track, true);
+    } catch (error) {
+      console.log("unpublishTrack(screenShare) error", error);
+    }
+
+    stopLocalTrack(track);
+  }
+};
+
+const disconnectRoomSafely = async (room) => {
+  if (!room) return;
+
+  await Promise.allSettled([
+    forceReleaseScreenShare(room),
+    forceReleaseCamera(room),
+    forceReleaseMicrophone(room),
+  ]);
+
+  try {
+    room.disconnect();
+  } catch (error) {
+    console.log("room.disconnect error", error);
+  }
+};
+
+const getReadableMediaError = (error, fallbackText) => {
+  const name = error?.name || "";
+  const message = error?.message || "";
+  const merged = `${name} ${message}`.trim();
+
+  if (!merged) {
+    return fallbackText;
+  }
+
+  return `${fallbackText} (${merged})`;
+};
+
+const isCameraBusyError = (error) => {
+  const text = `${error?.name || ""} ${error?.message || ""}`.toLowerCase();
+
+  return (
+    text.includes("failed to allocate videosource") ||
+    text.includes("notreadable") ||
+    text.includes("device in use") ||
+    text.includes("could not start video source") ||
+    text.includes("starting video failed")
+  );
+};
 
 const CallTile = ({ trackRef, isFocused = false, onClick }) => {
   const participant = trackRef?.participant;
@@ -162,7 +317,9 @@ const CallStage = ({ focusedTrackKey, onFocusChange }) => {
       return;
     }
 
-    const exists = tracks.some((trackRef) => getTrackKey(trackRef) === focusedTrackKey);
+    const exists = tracks.some(
+      (trackRef) => getTrackKey(trackRef) === focusedTrackKey
+    );
 
     if (!exists) {
       const screenTrack = tracks.find((trackRef) => isScreenShareTrack(trackRef));
@@ -263,6 +420,7 @@ const CallPage = () => {
   const chatType = searchParams.get("chatType") === "channel" ? "channel" : "contact";
   const peerId = searchParams.get("peerId");
   const channelId = searchParams.get("channelId");
+  const CALL_MEDIA_OWNER = `call:${callId}`;
 
   const room = useMemo(
     () =>
@@ -276,9 +434,9 @@ const CallPage = () => {
   const isConnectedRef = useRef(false);
   const hadRemoteParticipantRef = useRef(false);
   const autoEndTimerRef = useRef(null);
+  const isCleaningUpRef = useRef(false);
 
   const [focusedTrackKey, setFocusedTrackKey] = useState(null);
-
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -295,10 +453,58 @@ const CallPage = () => {
     }
   }, []);
 
+  const syncLocalMediaState = useCallback(() => {
+    setIsMicEnabled(Boolean(room.localParticipant?.isMicrophoneEnabled));
+    setIsCameraEnabled(Boolean(room.localParticipant?.isCameraEnabled));
+    setIsScreenSharing(Boolean(room.localParticipant?.isScreenShareEnabled));
+  }, [room]);
+
+  const syncCallOwnerRegistration = useCallback(async () => {
+    const hasActiveMedia =
+      Boolean(room.localParticipant?.isMicrophoneEnabled) ||
+      Boolean(room.localParticipant?.isCameraEnabled) ||
+      Boolean(room.localParticipant?.isScreenShareEnabled);
+
+    if (!hasActiveMedia) {
+      await releaseManagedOwner(CALL_MEDIA_OWNER);
+      return;
+    }
+
+    await registerManagedExternalOwner({
+      owner: CALL_MEDIA_OWNER,
+      release: async () => {
+        await Promise.allSettled([
+          forceReleaseScreenShare(room),
+          forceReleaseCamera(room),
+          forceReleaseMicrophone(room),
+        ]);
+      },
+    });
+  }, [room, CALL_MEDIA_OWNER]);
+
+  const cleanupRoom = useCallback(async () => {
+    if (isCleaningUpRef.current) return;
+    isCleaningUpRef.current = true;
+
+    clearAutoEndTimer();
+
+    try {
+      await disconnectRoomSafely(room);
+    } finally {
+      await releaseManagedOwner(CALL_MEDIA_OWNER);
+      isConnectedRef.current = false;
+      hadRemoteParticipantRef.current = false;
+      setIsConnected(false);
+      setIsMicEnabled(false);
+      setIsCameraEnabled(false);
+      setIsScreenSharing(false);
+      setParticipantsCount(0);
+      setFocusedTrackKey(null);
+    }
+  }, [room, clearAutoEndTimer, CALL_MEDIA_OWNER]);
+
   const performLeave = useCallback(
     async (notifyServer = true) => {
-      clearAutoEndTimer();
-
       if (notifyServer) {
         socket?.emit("end-call", {
           callId,
@@ -310,19 +516,10 @@ const CallPage = () => {
 
       socket?.emit("leave-call-room", { callId });
 
-      try {
-        await Promise.allSettled([
-          room.localParticipant.setScreenShareEnabled(false),
-          room.localParticipant.setCameraEnabled(false),
-          room.localParticipant.setMicrophoneEnabled(false),
-        ])
-      } catch (err){
-        console.log(err)
-      }
-      room.disconnect();
+      await cleanupRoom();
       navigate("/chat");
     },
-    [socket, callId, peerId, channelId, chatType, room, navigate, clearAutoEndTimer]
+    [socket, callId, peerId, channelId, chatType, cleanupRoom, navigate]
   );
 
   useEffect(() => {
@@ -352,6 +549,7 @@ const CallPage = () => {
       return;
     }
 
+    isCleaningUpRef.current = false;
     let cancelled = false;
 
     const syncRemoteParticipantState = (connectedValue = isConnectedRef.current) => {
@@ -416,7 +614,7 @@ const CallPage = () => {
         });
 
         if (cancelled) {
-          room.disconnect();
+          await disconnectRoomSafely(room);
           return;
         }
 
@@ -427,14 +625,14 @@ const CallPage = () => {
 
         isConnectedRef.current = true;
         setIsConnected(true);
-        setIsLoading(false);
-        setIsMicEnabled(false);
-        setIsCameraEnabled(false);
+        syncLocalMediaState();
         syncRemoteParticipantState(true);
-
-      } catch (err) {
-        console.log(err);
-        setErrorText("Не удалось подключиться к звонку.");
+        setIsLoading(false);
+      } catch (error) {
+        console.log("connectToRoom error", error);
+        setErrorText(
+          getReadableMediaError(error, "Не удалось подключиться к звонку.")
+        );
         setIsLoading(false);
       }
     };
@@ -442,12 +640,14 @@ const CallPage = () => {
     const handleConnected = () => {
       isConnectedRef.current = true;
       setIsConnected(true);
+      syncLocalMediaState();
       syncRemoteParticipantState(true);
     };
 
     const handleDisconnected = () => {
       isConnectedRef.current = false;
       setIsConnected(false);
+      syncLocalMediaState();
       syncRemoteParticipantState(false);
     };
 
@@ -459,55 +659,188 @@ const CallPage = () => {
       syncRemoteParticipantState(true);
     };
 
+    const handleMediaDevicesError = (error) => {
+      console.log("LiveKit media device error", error);
+
+      const cameraError = room.localParticipant?.lastCameraError || error;
+
+      if (isCameraBusyError(cameraError)) {
+        toast.error(
+          "Камера занята или не успела освободиться. Закрой другие вкладки и приложения с камерой."
+        );
+      } else {
+        toast.error(
+          getReadableMediaError(error, "Ошибка доступа к камере или микрофону.")
+        );
+      }
+
+      syncLocalMediaState();
+    };
+
     room.on(RoomEvent.Connected, handleConnected);
     room.on(RoomEvent.Disconnected, handleDisconnected);
     room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
     room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+    room.on(RoomEvent.MediaDevicesError, handleMediaDevicesError);
 
     connectToRoom();
 
     return () => {
       cancelled = true;
       clearAutoEndTimer();
-
       socket?.emit("leave-call-room", { callId });
 
       room.off(RoomEvent.Connected, handleConnected);
       room.off(RoomEvent.Disconnected, handleDisconnected);
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+      room.off(RoomEvent.MediaDevicesError, handleMediaDevicesError);
 
-      room.disconnect();
+      cleanupRoom();
     };
-  }, [callId, room, userInfo, chatType, socket, clearAutoEndTimer, performLeave]);
+  }, [
+    callId,
+    room,
+    userInfo,
+    chatType,
+    socket,
+    clearAutoEndTimer,
+    performLeave,
+    cleanupRoom,
+    syncLocalMediaState,
+  ]);
 
   const toggleMicrophone = async () => {
+    const nextValue = !room.localParticipant.isMicrophoneEnabled;
+
     try {
-      const nextValue = !isMicEnabled;
-      await room.localParticipant.setMicrophoneEnabled(nextValue);
-      setIsMicEnabled(nextValue);
-    } catch (err) {
-      console.log(err);
+      if (!nextValue) {
+        await forceReleaseMicrophone(room);
+        syncLocalMediaState();
+        await syncCallOwnerRegistration();
+        return;
+      }
+
+      await registerManagedExternalOwner({
+        owner: CALL_MEDIA_OWNER,
+        release: async () => {
+          await Promise.allSettled([
+            forceReleaseScreenShare(room),
+            forceReleaseCamera(room),
+            forceReleaseMicrophone(room),
+          ]);
+        },
+      });
+
+      await room.localParticipant.setMicrophoneEnabled(true);
+      syncLocalMediaState();
+      await syncCallOwnerRegistration();
+    } catch (error) {
+      console.log("toggleMicrophone error", error);
+      toast.error(
+        getReadableMediaError(
+          room.localParticipant?.lastMicrophoneError || error,
+          "Не удалось включить микрофон."
+        )
+      );
+      syncLocalMediaState();
+      await syncCallOwnerRegistration();
     }
   };
 
   const toggleCamera = async () => {
+    const nextValue = !room.localParticipant.isCameraEnabled;
+
     try {
-      const nextValue = !isCameraEnabled;
-      await room.localParticipant.setCameraEnabled(nextValue);
-      setIsCameraEnabled(nextValue);
-    } catch (err) {
-      console.log(err);
+      if (!nextValue) {
+        await forceReleaseCamera(room);
+        syncLocalMediaState();
+        await syncCallOwnerRegistration();
+        return;
+      }
+
+      await registerManagedExternalOwner({
+        owner: CALL_MEDIA_OWNER,
+        release: async () => {
+          await Promise.allSettled([
+            forceReleaseScreenShare(room),
+            forceReleaseCamera(room),
+            forceReleaseMicrophone(room),
+          ]);
+        },
+      });
+
+      await room.localParticipant.setCameraEnabled(true);
+      syncLocalMediaState();
+      await syncCallOwnerRegistration();
+    } catch (error) {
+      console.log("toggleCamera error", error);
+
+      const actualError = room.localParticipant?.lastCameraError || error;
+
+      if (isCameraBusyError(actualError)) {
+        try {
+          await forceReleaseCamera(room);
+          await wait(800);
+          await room.localParticipant.setCameraEnabled(true);
+          syncLocalMediaState();
+          await syncCallOwnerRegistration();
+          toast.success("Камера была перезапущена.");
+          return;
+        } catch (retryError) {
+          console.log("toggleCamera retry error", retryError);
+          toast.error(
+            "Камера занята или не успела освободиться. Закрой другие вкладки и приложения с камерой и попробуй ещё раз."
+          );
+          syncLocalMediaState();
+          await syncCallOwnerRegistration();
+          return;
+        }
+      }
+
+      toast.error(
+        getReadableMediaError(actualError, "Не удалось включить камеру.")
+      );
+      syncLocalMediaState();
+      await syncCallOwnerRegistration();
     }
   };
 
   const toggleScreenShare = async () => {
     try {
-      const nextValue = !isScreenSharing;
-      await room.localParticipant.setScreenShareEnabled(nextValue);
-      setIsScreenSharing(nextValue);
-    } catch (err) {
-      console.log(err);
+      const nextValue = !room.localParticipant.isScreenShareEnabled;
+
+      if (!nextValue) {
+        await forceReleaseScreenShare(room);
+        syncLocalMediaState();
+        await syncCallOwnerRegistration();
+        return;
+      }
+
+      await registerManagedExternalOwner({
+        owner: CALL_MEDIA_OWNER,
+        release: async () => {
+          await Promise.allSettled([
+            forceReleaseScreenShare(room),
+            forceReleaseCamera(room),
+            forceReleaseMicrophone(room),
+          ]);
+        },
+      });
+
+      await room.localParticipant.setScreenShareEnabled(true);
+      syncLocalMediaState();
+      await syncCallOwnerRegistration();
+    } catch (error) {
+      console.log("toggleScreenShare error", error);
+      toast.error(
+        getReadableMediaError(
+          error,
+          "Не удалось включить демонстрацию экрана."
+        )
+      );
+      syncLocalMediaState();
+      await syncCallOwnerRegistration();
     }
   };
 

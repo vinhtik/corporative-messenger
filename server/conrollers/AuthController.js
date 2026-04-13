@@ -43,8 +43,9 @@ export const signup = async (request, response) => {
 
     response.cookie("jwt", createToken(email, user.id), {
       maxAge,
-      secure: false,
+      secure: true,
       sameSite: "Lax",
+      httpOnly: true,
     });
 
     return response.status(201).json({
@@ -77,8 +78,9 @@ export const login = async (request, response) => {
 
     response.cookie("jwt", createToken(email, user.id), {
       maxAge,
-      secure: false,
+      secure: true,
       sameSite: "Lax",
+      httpOnly: true,
     });
 
     return response.status(200).json({
@@ -372,7 +374,11 @@ export const deleteProfilePhoto = async (request, response) => {
 
 export const logout = async (request, response) => {
   try {
-    response.cookie("jwt", "", { maxAge: 1, secure: false, sameSite: "Lax" });
+    response.cookie("jwt", "", { 
+        maxAge: 1,
+        secure: true,
+        sameSite: "Lax",
+        httpOnly: true, });
     return response.status(200).send("Logout successfull");
   } catch (err) {
     console.log({ err });

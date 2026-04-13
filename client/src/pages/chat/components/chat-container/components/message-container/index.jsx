@@ -93,11 +93,30 @@ const MessageContainer = () => {
     return typeof message?.mimeType === "string" && message.mimeType.startsWith("image/");
   };
 
+  const isAudioMessage = (message) => {
+    return (
+      message?.messageType === "audio" ||
+      (typeof message?.mimeType === "string" && message.mimeType.startsWith("audio/"))
+    );
+  };
+
+  const isVideoNoteMessage = (message) => {
+    return message?.messageType === "video-note";
+  };
+
   const getProtectedFileUrl = (messageId, download = false) => {
     return `${HOST}/${GET_MESSAGE_FILE_ROUTE}/${messageId}${download ? "?download=1" : ""}`;
   };
 
   const getMessageFileLabel = (message) => {
+    if (message?.messageType === "audio") {
+      return "Голосовое сообщение";
+    }
+
+    if (message?.messageType === "video-note") {
+      return "Видеосообщение";
+    }
+
     if (isImageMessage(message)) {
       return "Изображение";
     }
@@ -114,29 +133,6 @@ const MessageContainer = () => {
     if (!headerValue) return null;
     const match = headerValue.match(/filename="([^"]+)"/);
     return match?.[1] || null;
-  };
-
-  const renderMessages = () => {
-    let lastDate = null;
-
-    return selectedChatMessages.map((message, index) => {
-      const messageDate = moment(message.timestamp).format("DD-MM-YYYY");
-      const showDate = messageDate !== lastDate;
-      lastDate = messageDate;
-
-      return (
-        <div key={index}>
-          {showDate && (
-            <div className="text-center text-gray-500 my-2">
-              {moment(message.timestamp).format("LL")}
-            </div>
-          )}
-
-          {selectedChatType === "contact" && renderDMMessages(message)}
-          {selectedChatType === "channel" && renderChannelMessages(message)}
-        </div>
-      );
-    });
   };
 
   const downloadFile = async (message) => {
@@ -180,64 +176,141 @@ const MessageContainer = () => {
     }
   };
 
+  const renderDownloadButton = (message) => {
+    return (
+      <span
+        className="bg-black/20 p-2 text-xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200 shrink-0"
+        onClick={() => downloadFile(message)}
+      >
+        {downloadingFile === message._id ? (
+          <p className="text-xs animate-pulse">{fileDownloadProgress}%</p>
+        ) : (
+          <IoMdArrowRoundDown />
+        )}
+      </span>
+    );
+  };
+
+  const renderMessageContent = (message) => {
+    if (message.messageType === "text") {
+      return <div className="whitespace-pre-wrap break-words">{message.content}</div>;
+    }
+
+    if (isImageMessage(message)) {
+      return (
+        <div className="flex flex-col gap-2">
+          <div
+            className="cursor-pointer"
+            onClick={() => {
+              setShowImage(true);
+              setImageMessageId(message._id);
+            }}
+          >
+            <img
+              src={getProtectedFileUrl(message._id)}
+              height={300}
+              width={300}
+              alt="Preview"
+              className="w-auto h-auto max-h-[300px] object-contain rounded-xl"
+            />
+          </div>
+
+          <div className="flex justify-end">{renderDownloadButton(message)}</div>
+        </div>
+      );
+    }
+
+    if (isAudioMessage(message)) {
+      return (
+        <div className="flex flex-col gap-3 min-w-[240px] max-w-[320px]">
+          <audio
+            controls
+            preload="metadata"
+            src={getProtectedFileUrl(message._id)}
+            className="w-full"
+          />
+
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs opacity-70">
+              {message.duration ? `${Math.round(message.duration)} сек` : "Голосовое сообщение"}
+            </span>
+            {renderDownloadButton(message)}
+          </div>
+        </div>
+      );
+    }
+
+    if (isVideoNoteMessage(message)) {
+      return (
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-36 w-36 md:h-44 md:w-44 rounded-full overflow-hidden bg-black">
+            <video
+              src={getProtectedFileUrl(message._id)}
+              controls
+              playsInline
+              preload="metadata"
+              className="h-full w-full object-cover"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs opacity-70">
+              {message.duration ? `${Math.round(message.duration)} сек` : "Видеосообщение"}
+            </span>
+            {renderDownloadButton(message)}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center justify-center gap-4">
+        <span className="pl-2">{getMessageFileLabel(message)}</span>
+        {renderDownloadButton(message)}
+      </div>
+    );
+  };
+
+  const getBubbleClasses = (isOwnMessage) => {
+    return `${
+      isOwnMessage
+        ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
+        : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
+    } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left`;
+  };
+
+  const renderMessages = () => {
+    let lastDate = null;
+
+    return selectedChatMessages.map((message, index) => {
+      const messageDate = moment(message.timestamp).format("DD-MM-YYYY");
+      const showDate = messageDate !== lastDate;
+      lastDate = messageDate;
+
+      return (
+        <div key={message._id || index}>
+          {showDate && (
+            <div className="text-center text-gray-500 my-2">
+              {moment(message.timestamp).format("LL")}
+            </div>
+          )}
+
+          {selectedChatType === "contact" && renderDMMessages(message)}
+          {selectedChatType === "channel" && renderChannelMessages(message)}
+        </div>
+      );
+    });
+  };
+
   const renderDMMessages = (message) => {
     const isIncoming = message.sender === selectedChatData._id;
+    const isOwnMessage = !isIncoming;
 
     return (
       <div className={`flex flex-col ${isIncoming ? "items-start" : "items-end"}`}>
-        {message.messageType === "text" && (
-          <div
-            className={`${
-              !isIncoming
-                ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
-                : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left whitespace-pre-wrap`}
-          >
-            {message.content}
-          </div>
-        )}
-
-        {message.messageType === "file" && (
-          <div
-            className={`${
-              !isIncoming
-                ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
-                : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left`}
-          >
-            {isImageMessage(message) ? (
-              <div
-                className="cursor-pointer"
-                onClick={() => {
-                  setShowImage(true);
-                  setImageMessageId(message._id);
-                }}
-              >
-                <img
-                  src={getProtectedFileUrl(message._id)}
-                  height={300}
-                  width={300}
-                  alt="Preview"
-                  className="w-auto h-auto max-h-[300px] object-contain"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-4">
-                <span className="pl-2">{getMessageFileLabel(message)}</span>
-                <span
-                  className="bg-black/20 p-2 text-xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
-                  onClick={() => downloadFile(message)}
-                >
-                  {downloadingFile === message._id ? (
-                    <p className="text-sm animate-pulse">{fileDownloadProgress}%</p>
-                  ) : (
-                    <IoMdArrowRoundDown />
-                  )}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className={getBubbleClasses(isOwnMessage)}>
+          {renderMessageContent(message)}
+        </div>
 
         <div className="text-xs text-gray-600">
           {moment(message.timestamp).format("LT")}
@@ -247,68 +320,18 @@ const MessageContainer = () => {
   };
 
   const renderChannelMessages = (message) => {
-    const isOwnMessage = message.sender._id === userInfo.id;
+    const isOwnMessage = message.sender?._id === userInfo.id;
 
     return (
       <div className={`mt-5 flex flex-col ${!isOwnMessage ? "items-start" : "items-end"}`}>
-        {message.messageType === "text" && (
-          <div
-            className={`${
-              isOwnMessage
-                ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
-                : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl md:ml-10 text-left whitespace-pre-wrap`}
-          >
-            {message.content}
-          </div>
-        )}
-
-        {message.messageType === "file" && (
-          <div
-            className={`${
-              isOwnMessage
-                ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
-                : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left`}
-          >
-            {isImageMessage(message) ? (
-              <div
-                className="cursor-pointer"
-                onClick={() => {
-                  setShowImage(true);
-                  setImageMessageId(message._id);
-                }}
-              >
-                <img
-                  src={getProtectedFileUrl(message._id)}
-                  height={300}
-                  width={300}
-                  alt="Preview"
-                  className="w-auto h-auto max-h-[300px] object-contain"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-4">
-                <span className="pl-2">{getMessageFileLabel(message)}</span>
-                <span
-                  className="bg-black/20 p-2 text-xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
-                  onClick={() => downloadFile(message)}
-                >
-                  {downloadingFile === message._id ? (
-                    <p className="text-sm animate-pulse">{fileDownloadProgress}%</p>
-                  ) : (
-                    <IoMdArrowRoundDown />
-                  )}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className={getBubbleClasses(isOwnMessage)}>
+          {renderMessageContent(message)}
+        </div>
 
         {!isOwnMessage ? (
           <div className="flex items-center justify-start gap-2">
             <Avatar className="h-8 w-8 rounded-full overflow-hidden">
-              {message.sender.image && (
+              {message.sender?.image && (
                 <AvatarImage
                   src={`${HOST}/${message.sender.image}`}
                   alt="profile"
@@ -317,17 +340,17 @@ const MessageContainer = () => {
               )}
               <AvatarFallback
                 className={`uppercase h-8 w-8 text-lg flex items-center justify-center rounded-full ${getColor(
-                  message.sender.color
+                  message.sender?.color
                 )}`}
               >
-                {message.sender.firstName
+                {message.sender?.firstName
                   ? message.sender.firstName.split("").shift()
-                  : message.sender.email.split("").shift()}
+                  : message.sender?.email?.split("").shift()}
               </AvatarFallback>
             </Avatar>
 
             <span className="text-sm text-white/60">
-              {`${message.sender.firstName} ${message.sender.lastName}`}
+              {`${message.sender?.firstName || ""} ${message.sender?.lastName || ""}`.trim()}
             </span>
 
             <span className="text-xs text-white/60">
@@ -394,3 +417,4 @@ const MessageContainer = () => {
 };
 
 export default MessageContainer;
+
