@@ -10,6 +10,7 @@ import messageRoutes from "./routes/MessagesRoutes.js";
 import channelRoutes from "./routes/ChannelRoutes.js";
 import callsRoutes from "./routes/CallsRoutes.js";
 import setupSocket from "./socket.js";
+import friendsRoutes from "./routes/FriendsRoutes.js";
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.use("/api/contacts", contactsRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/channel", channelRoutes);
 app.use("/api/calls", callsRoutes);
+app.use("/api/friends", friendsRoutes)
 
 const server = app.listen(port, () => {
   console.log(`Server is runnig at http://localhost:${port}`);

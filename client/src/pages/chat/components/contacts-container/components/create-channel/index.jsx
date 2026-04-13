@@ -1,119 +1,156 @@
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { useEffect, useState } from "react"
-import { FaPlus } from "react-icons/fa"
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useEffect, useState } from "react";
+import { FaPlus } from "react-icons/fa";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { apiClient } from "@/lib/api-client"
-import { CREATE_CHANNEL_ROUTE, GET_ALL_CONTACTS_ROUTES } from "@/utils/constants"
-import { useAppStore } from "@/store"
-import { Button } from "@/components/ui/button"
-import MultipleSelector from "@/components/ui/multipleselect"
-  
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { apiClient } from "@/lib/api-client";
+import {
+  CREATE_CHANNEL_ROUTE,
+  GET_FRIENDS_SELECTOR_ROUTE,
+} from "@/utils/constants";
+import { useAppStore } from "@/store";
+import { Button } from "@/components/ui/button";
+import MultipleSelector from "@/components/ui/multipleselect";
+import { toast } from "sonner";
 
 const CreateChannel = () => {
-const { setSelectedChatType, setSelectedChatData, addChannel } = useAppStore();
-const [newChannelModal, setNewChannelModal] = useState(false);
-const [allContacts, setAllContacts] = useState([]);
-const [selectedContacts, setSelectedContacts] = useState([])
-const [channelName, setChannelName] = useState("")
+  const { addChannel } = useAppStore();
 
-useEffect(() => {
+  const [newChannelModal, setNewChannelModal] = useState(false);
+  const [friendOptions, setFriendOptions] = useState([]);
+  const [selectedFriends, setSelectedFriends] = useState([]);
+  const [channelName, setChannelName] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
+
+  useEffect(() => {
+    if (!newChannelModal) return;
+
     const getData = async () => {
-        const response = await apiClient.get(GET_ALL_CONTACTS_ROUTES, {
-            withCredentials: true,
+      try {
+        const response = await apiClient.get(GET_FRIENDS_SELECTOR_ROUTE, {
+          withCredentials: true,
         });
-        setAllContacts(response.data.contacts)
-    };
-    getData();
-}, [])
 
-const createChannel = async () => {
+        setFriendOptions(response.data?.friends || []);
+      } catch (error) {
+        console.log(error);
+        toast.error("Не удалось загрузить друзей");
+      }
+    };
+
+    getData();
+  }, [newChannelModal]);
+
+  const createChannel = async () => {
     try {
-        if(channelName.length > 0 && selectedContacts.length > 0) {
-        const response = await apiClient.post(CREATE_CHANNEL_ROUTE, {
-            name: channelName,
-            members: selectedContacts.map((contact) => contact.value),
+      if (!channelName.trim()) {
+        toast.error("Введите название группы");
+        return;
+      }
+
+      if (!selectedFriends.length) {
+        toast.error("Выберите хотя бы одного друга");
+        return;
+      }
+
+      setIsBusy(true);
+
+      const response = await apiClient.post(
+        CREATE_CHANNEL_ROUTE,
+        {
+          name: channelName.trim(),
+          members: selectedFriends.map((friend) => friend.value),
         },
-    { withCredentials: true }
-    );
-    if(response.status === 201){
+        { withCredentials: true }
+      );
+
+      if (response.status === 201) {
         setChannelName("");
-        setSelectedContacts([]);
+        setSelectedFriends([]);
         setNewChannelModal(false);
         addChannel(response.data.channel);
-    }
-
-    }
+        toast.success("Группа создана");
+      }
     } catch (error) {
-        console.log(error)
+      console.log(error);
+      toast.error(error?.response?.data || "Не удалось создать группу");
+    } finally {
+      setIsBusy(false);
     }
-}
+  };
 
   return (
     <>
-    <TooltipProvider>
+      <TooltipProvider>
         <Tooltip>
-            <TooltipTrigger>
-                <FaPlus 
-                className="text-neutral-400 font-light text-opacity-90 text-start hover:text-neutral-100 cursor-pointer transition-all duration-200"
-                onClick={() => setNewChannelModal(true)}
-                />
-            </TooltipTrigger>
-            <TooltipContent
-            className="bg-[#1c1b1e] border-none mb-2 p-3 text-white"
-            >
-            Новая группа
-            </TooltipContent>
-        </Tooltip>
-    </TooltipProvider>
-    <Dialog open = {newChannelModal} onOpenChange={setNewChannelModal}>
-        <DialogContent className="bg-[#181920] border-none text-white w-[400px] h-[400px] flex flex-col">
-            <DialogHeader>
-            <DialogTitle>
-                Создание группы
-            </DialogTitle>
-            <DialogDescription>
-                
-            </DialogDescription>
-            </DialogHeader>
-            <div>
-                <Input placeholder="Название группы" className="rounded-lg p-6 bg-[#2c2e3b] border-none" 
-                onChange = {e => setChannelName(e.target.value)} value={channelName}
-                />
-            </div>
-            <MultipleSelector 
-            className="rounded-lg bg-[#2c2e3b] border-none py-2 text-white"
-            defaultOptions={allContacts}
-            placeholder="Найти контакты"
-            value={selectedContacts}
-            onChange={setSelectedContacts}
-            emptyIndicator={
-                <p className="text-center text-lg leading-10 text-gray-600">Нет результатов</p>
-            }
+          <TooltipTrigger>
+            <FaPlus
+              className="text-neutral-400 font-light text-opacity-90 text-start hover:text-neutral-100 cursor-pointer transition-all duration-200"
+              onClick={() => setNewChannelModal(true)}
             />
-            <div>
-                <Button className="w-full bg-green-700 hover:bg-green-900 transition-all duration-200"
-                onClick={createChannel}
-                >
-                    Создать группу
-                </Button>
-            </div>
+          </TooltipTrigger>
+          <TooltipContent className="bg-[#1c1b1e] border-none mb-2 p-3 text-white">
+            Новая группа
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <Dialog open={newChannelModal} onOpenChange={setNewChannelModal}>
+        <DialogContent className="bg-[#181920] border-none text-white w-[400px] h-[400px] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Создание группы</DialogTitle>
+            <DialogDescription className="text-white/50">
+              В группу можно приглашать только друзей.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div>
+            <Input
+              placeholder="Название группы"
+              className="rounded-lg p-6 bg-[#2c2e3b] border-none"
+              onChange={(e) => setChannelName(e.target.value)}
+              value={channelName}
+              disabled={isBusy}
+            />
+          </div>
+
+          <MultipleSelector
+            className="rounded-lg bg-[#2c2e3b] border-none py-2 text-white"
+            options={friendOptions}
+            placeholder="Выбрать друзей"
+            value={selectedFriends}
+            onChange={setSelectedFriends}
+            emptyIndicator={
+              <p className="text-center text-lg leading-10 text-gray-600">
+                Нет доступных друзей
+              </p>
+            }
+          />
+
+          <div>
+            <Button
+              className="w-full bg-green-700 hover:bg-green-900 transition-all duration-200"
+              onClick={createChannel}
+              disabled={isBusy}
+            >
+              Создать группу
+            </Button>
+          </div>
         </DialogContent>
-    </Dialog>
-
+      </Dialog>
     </>
-  )
-}
+  );
+};
 
-export default CreateChannel
+export default CreateChannel;

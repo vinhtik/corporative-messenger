@@ -37,3 +37,15 @@ export const GET_PROFILE_PHOTOS_ROUTE = `${AUTH_ROUTES}/profile-photos`;
 export const ADD_PROFILE_PHOTO_ROUTE = `${AUTH_ROUTES}/profile-photos`;
 export const SET_AVATAR_PHOTO_ROUTE = `${AUTH_ROUTES}/profile-photos`;
 export const CONTACT_PROFILE_ROUTE = `${CONTACTS_ROUTES}/profile`;
+
+export const FRIENDS_ROUTES = "api/friends";
+export const SEARCH_USERS_FOR_FRIENDSHIP_ROUTE = `${FRIENDS_ROUTES}/search-users`;
+export const SEND_FRIEND_REQUEST_ROUTE = `${FRIENDS_ROUTES}/request`;
+export const GET_INCOMING_FRIEND_REQUESTS_ROUTE = `${FRIENDS_ROUTES}/requests/incoming`;
+export const GET_OUTGOING_FRIEND_REQUESTS_ROUTE = `${FRIENDS_ROUTES}/requests/outgoing`;
+export const ACCEPT_FRIEND_REQUEST_ROUTE = `${FRIENDS_ROUTES}/request`;
+export const REJECT_FRIEND_REQUEST_ROUTE = `${FRIENDS_ROUTES}/request`;
+export const REMOVE_FRIEND_ROUTE = `${FRIENDS_ROUTES}`;
+export const GET_FRIENDS_LIST_ROUTE = `${FRIENDS_ROUTES}/list`;
+export const GET_FRIENDS_SELECTOR_ROUTE = `${FRIENDS_ROUTES}/selector`;
+export const CANCEL_FRIEND_REQUEST_ROUTE = `${FRIENDS_ROUTES}/request`;

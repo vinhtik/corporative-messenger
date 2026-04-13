@@ -191,7 +191,7 @@ const MessageContainer = () => {
               !isIncoming
                 ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
                 : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border inline-block p-2 my-1 max-w-[50%] break-words rounded-t-2xl text-left whitespace-pre-wrap`}
+            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left whitespace-pre-wrap`}
           >
             {message.content}
           </div>
@@ -203,7 +203,7 @@ const MessageContainer = () => {
               !isIncoming
                 ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
                 : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border inline-block p-2 my-1 max-w-[50%] break-words rounded-t-2xl text-left`}
+            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left`}
           >
             {isImageMessage(message) ? (
               <div
@@ -250,14 +250,14 @@ const MessageContainer = () => {
     const isOwnMessage = message.sender._id === userInfo.id;
 
     return (
-      <div className={`mt-5 ${!isOwnMessage ? "text-left" : "text-right"}`}>
+      <div className={`mt-5 flex flex-col ${!isOwnMessage ? "items-start" : "items-end"}`}>
         {message.messageType === "text" && (
           <div
             className={`${
               isOwnMessage
                 ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
                 : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border inline-block p-2 my-1 max-w-[50%] break-words rounded-t-2xl ml-10 text-left whitespace-pre-wrap`}
+            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl md:ml-10 text-left whitespace-pre-wrap`}
           >
             {message.content}
           </div>
@@ -269,7 +269,7 @@ const MessageContainer = () => {
               isOwnMessage
                 ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
                 : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
-            } border inline-block p-2 my-1 max-w-[50%] break-words rounded-t-2xl text-left`}
+            } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left`}
           >
             {isImageMessage(message) ? (
               <div
@@ -344,7 +344,7 @@ const MessageContainer = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-hidden p-4 md:px-8 md:w-[65vw] lg:w-[70vw] xl:w-[80vw] w-full">
+    <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hidden p-4 md:px-8 md:w-[65vw] lg:w-[70vw] xl:w-[80vw] w-full">
       {renderMessages()}
       <div ref={scrollRef} />
 

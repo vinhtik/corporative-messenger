@@ -98,6 +98,17 @@ export const createChannel = async (request, response) => {
       }
     }
 
+    const hasAccessToAllMembers = await areAllUsersFriendsWithUser(
+    userId,
+    requestedMemberIds
+  );
+
+  if (!hasAccessToAllMembers) {
+    return response
+      .status(403)
+      .send("You can only create groups with your friends");
+  }
+
     const newChannel = new Channel({
       name: name.trim(),
       members: buildChannelMembers({
@@ -261,6 +272,18 @@ export const addChannelMembers = async (request, response) => {
         channel: formatChannel(populatedChannel, userId),
       });
     }
+
+    const hasAccessToAllMembers = await areAllUsersFriendsWithUser(
+      userId,
+      usersToAdd
+    );
+
+    if (!hasAccessToAllMembers) {
+      return response
+        .status(403)
+        .send("You can only invite your friends");
+    }
+
 
     const validUsers = await User.find({ _id: { $in: usersToAdd } });
 

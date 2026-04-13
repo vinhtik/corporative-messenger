@@ -128,7 +128,7 @@ const MessageBar = () => {
   };
 
   return (
-    <div className="h-[10vh] bg-[#1c1d25] flex justify-center items-center md:px-8 px-2 md:mb-6 gap-2 md:gap-6">
+    <div className="h-[10vh] shrink-0 min-h-16 md:min-h-20 bg-[#1c1d25] pb-[env(safe-area-inset-bottom)] flex justify-center items-center md:px-8 px-2 md:mb-6 gap-2 md:gap-6">
       <div className="flex-1 flex bg-[#2a2b33] px-2 rounded-xl items-center pr-5">
         <textarea
           className="flex-1 md:p-5 p-2 bg-transparent rounded-xl focus:border-none focus:outline-none resize-none overflow-hidden"
