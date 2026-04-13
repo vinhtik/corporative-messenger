@@ -561,7 +561,7 @@ const FriendsManager = () => {
                 <div className="flex flex-col gap-3">
                   {!searchTerm.trim() && (
                     <div className="text-white/50 text-sm text-center py-10">
-                      Начни вводить имя, фамилию
+                      Введите имя
                     </div>
                   )}
 

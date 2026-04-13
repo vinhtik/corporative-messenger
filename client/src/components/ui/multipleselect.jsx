@@ -118,7 +118,6 @@ const MultipleSelector = React.forwardRef(
     }, [value]);
 
     useEffect(() => {
-      /** If `onSearch` is provided, do not trigger options updated. */
       if (!arrayOptions || onSearch) {
         return;
       }
@@ -384,7 +383,7 @@ const MultipleSelector = React.forwardRef(
                           return (
                             <CommandItem
                               key={option.value}
-                              value={option.value}
+                              value={`${option.label} ${option.value}`}
                               disabled={option.disable}
                               onMouseDown={(e) => {
                                 e.preventDefault();
@@ -408,6 +407,7 @@ const MultipleSelector = React.forwardRef(
                             >
                               {option.label}
                             </CommandItem>
+
                           );
                         })}
                       </>
