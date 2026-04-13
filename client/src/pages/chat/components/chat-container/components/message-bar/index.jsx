@@ -33,10 +33,7 @@ const MessageBar = () => {
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleAddEmoji = (emoji) => {
@@ -54,6 +51,7 @@ const MessageBar = () => {
         recipient: selectedChatData._id,
         messageType: "text",
         fileUrl: undefined,
+        mimeType: undefined,
       });
     } else if (selectedChatType === "channel") {
       socket.emit("send-channel-message", {
@@ -61,6 +59,7 @@ const MessageBar = () => {
         content: trimmedMessage,
         messageType: "text",
         fileUrl: undefined,
+        mimeType: undefined,
         channelId: selectedChatData._id,
       });
     }
@@ -76,9 +75,7 @@ const MessageBar = () => {
   };
 
   const handleAttachmentClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    fileInputRef.current?.click();
   };
 
   const handleAttachmentChange = async (event) => {
@@ -102,20 +99,22 @@ const MessageBar = () => {
       if (response.status === 200 && response.data) {
         setIsUploading(false);
 
+        const payload = {
+          sender: userInfo.id,
+          content: undefined,
+          messageType: "file",
+          fileUrl: response.data.filePath,
+          mimeType: response.data.mimeType,
+        };
+
         if (selectedChatType === "contact") {
           socket.emit("sendMessage", {
-            sender: userInfo.id,
-            content: undefined,
+            ...payload,
             recipient: selectedChatData._id,
-            messageType: "file",
-            fileUrl: response.data.filePath,
           });
         } else if (selectedChatType === "channel") {
           socket.emit("send-channel-message", {
-            sender: userInfo.id,
-            content: undefined,
-            messageType: "file",
-            fileUrl: response.data.filePath,
+            ...payload,
             channelId: selectedChatData._id,
           });
         }
@@ -129,10 +128,10 @@ const MessageBar = () => {
   };
 
   return (
-    <div className="h-[10vh] bg-[#1c1d25] flex justify-center items-center px-8 mb-6 gap-6">
-      <div className="flex-1 flex bg-[#2a2b33] rounded-md items-center pr-5">
+    <div className="h-[10vh] bg-[#1c1d25] flex justify-center items-center md:px-8 px-2 md:mb-6 gap-2 md:gap-6">
+      <div className="flex-1 flex bg-[#2a2b33] px-2 rounded-xl items-center pr-5">
         <textarea
-          className="flex-1 p-5 bg-transparent rounded-md focus:border-none focus:outline-none resize-none overflow-hidden"
+          className="flex-1 md:p-5 p-2 bg-transparent rounded-xl focus:border-none focus:outline-none resize-none overflow-hidden"
           placeholder="Введите сообщение"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -155,7 +154,7 @@ const MessageBar = () => {
           onChange={handleAttachmentChange}
         />
 
-        <div className="relative">
+        <div className="relative flex">
           <button
             className="text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-200 transition-all ml-1"
             onClick={() => setEmojiPickerOpen((prev) => !prev)}
@@ -171,7 +170,7 @@ const MessageBar = () => {
                 open={emojiPickerOpen}
                 onEmojiClick={handleAddEmoji}
                 autoFocusSearch={false}
-                width={isMobile ? 280 : 350}
+                width={isMobile ? 250 : 350}
                 height={isMobile ? 350 : 450}
               />
             </div>
@@ -180,7 +179,7 @@ const MessageBar = () => {
       </div>
 
       <button
-        className="bg-[#1fce4a] rounded-md flex items-center justify-center p-5 focus:border-none hover:bg-[#1bda54ac] focus:bg-[#1bda54ac] focus:outline-none focus:text-white duration-200 transition-all"
+        className="bg-[#1fce4a] rounded-xl flex items-center justify-center md:p-5 p-2 focus:border-none hover:bg-[#1bda54ac] focus:bg-[#1bda54ac] focus:outline-none focus:text-white duration-200 transition-all"
         onClick={handleSendMessage}
         type="button"
       >

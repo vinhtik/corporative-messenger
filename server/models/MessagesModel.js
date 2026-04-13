@@ -28,6 +28,12 @@ const messageSchema = new mongoose.Schema({
             return this.messageType === "file";
         },
     },
+    mimeType: {
+        type: String,
+        required: function () {
+            return this.messageType === "file";
+        },
+    },
     timestamp:{
         type: Date,
         default: Date.now,

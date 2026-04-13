@@ -90,7 +90,7 @@ const setupSocket = (server) => {
   };
 
   const sendChannelMessage = async (message) => {
-    const { channelId, sender, content, messageType, fileUrl } = message;
+    const { channelId, sender, content, messageType, fileUrl, mimeType } = message;
 
     const channel = await Channel.findById(channelId);
 
@@ -109,6 +109,7 @@ const setupSocket = (server) => {
       messageType,
       timestamp: new Date(),
       fileUrl,
+      mimeType,
     });
 
     const messageData = await Message.findById(createdMessage._id)
