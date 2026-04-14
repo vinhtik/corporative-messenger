@@ -53,7 +53,9 @@ const UserProfileDialog = ({
     return photos.find((photo) => photo.isAvatar) || null;
   }, [photos]);
 
-  const isOwnProfile = String(user?._id || "") === String(userInfo?.id || "");
+  const isOwnProfile = 
+  String(user?._id || "") === String(userInfo?.id || "") ||
+  String(user?._id || "") === String(userInfo?._id || "");
 
   const handlePhotoClick = (_, index) => {
     setViewerIndex(index);
