@@ -77,10 +77,21 @@ const isCameraBusyError = (error) => {
   );
 };
 
+const getMessageAudioConstraints = () => {
+  return {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+    channelCount: { ideal: 1 },
+    sampleRate: { ideal: 48000 },
+    sampleSize: { ideal: 16 },
+  };
+};
+
 const buildConstraintsForMode = async (mode, facingMode = "user") => {
   if (mode === "video-note") {
     return {
-      audio: true,
+      audio: getMessageAudioConstraints(),
       video: await getPreferredVideoConstraints({
         facingMode,
         width: 720,
@@ -91,9 +102,25 @@ const buildConstraintsForMode = async (mode, facingMode = "user") => {
   }
 
   return {
-    audio: true,
+    audio: getMessageAudioConstraints(),
     video: false,
   };
+};
+
+const buildRecorderOptions = ({ mimeType, isVideoMode }) => {
+  const options = {
+    audioBitsPerSecond: 128000,
+  };
+
+  if (mimeType) {
+    options.mimeType = mimeType;
+  }
+
+  if (isVideoMode) {
+    options.videoBitsPerSecond = 2500000;
+  }
+
+  return options;
 };
 
 const MessageBar = () => {
@@ -593,9 +620,12 @@ const MessageBar = () => {
         await attachPreviewStream(stream);
       }
 
-      const recorder = selectedMimeType
-        ? new MediaRecorder(stream, { mimeType: selectedMimeType })
-        : new MediaRecorder(stream);
+      const recorderOptions = buildRecorderOptions({
+        mimeType: selectedMimeType,
+        isVideoMode,
+      });
+
+      const recorder = new MediaRecorder(stream, recorderOptions);
 
       mediaRecorderRef.current = recorder;
 
