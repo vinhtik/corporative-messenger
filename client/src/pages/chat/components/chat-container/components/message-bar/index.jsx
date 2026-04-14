@@ -138,6 +138,7 @@ const MessageBar = () => {
   const holdToRecordRef = useRef(false);
   const activePointerIdRef = useRef(null);
   const pointerStartYRef = useRef(0);
+  const isLockedRecordingRef = useRef(false);
 
   const socket = useSocket();
 
@@ -250,10 +251,17 @@ const MessageBar = () => {
     setRecordingSeconds(0);
   };
 
+  const setRecordingLocked = (value) => {
+    isLockedRecordingRef.current = value;
+    setIsLockedRecording(value);
+  };
+
   const resetGestureState = () => {
     holdToRecordRef.current = false;
     activePointerIdRef.current = null;
     pointerStartYRef.current = 0;
+    isLockedRecordingRef.current = false;
+    setIsLockedRecording(false);
     setLockGuideProgress(0);
   };
 
@@ -270,7 +278,7 @@ const MessageBar = () => {
     clearRecordedDraft();
     setRecordingMode(null);
     setIsRecording(false);
-    setIsLockedRecording(false);
+    setRecordingLocked(false);
     setIsSwitchingCamera(false);
     autoSendOnStopRef.current = false;
     discardOnStopRef.current = false;
@@ -540,6 +548,14 @@ const MessageBar = () => {
       return;
     }
 
+    try {
+      if (recorder.state === "recording") {
+        recorder.requestData();
+      }
+    } catch (error) {
+      console.log("requestData error", error);
+    }
+
     recorder.stop();
     setIsRecording(false);
   };
@@ -602,7 +618,7 @@ const MessageBar = () => {
       clearRecordedDraft();
       setRecordingMode(mode);
       setIsRecording(true);
-      setIsLockedRecording(false);
+      setRecordingLocked(false);
       setIsSwitchingCamera(false);
       resetRecordingClock();
       setLockGuideProgress(0);
@@ -652,7 +668,7 @@ const MessageBar = () => {
         mediaRecorderRef.current = null;
         discardOnStopRef.current = false;
         autoSendOnStopRef.current = false;
-        setIsLockedRecording(false);
+        setRecordingLocked(false);
         setIsSwitchingCamera(false);
         resetGestureState();
 
@@ -747,7 +763,7 @@ const MessageBar = () => {
       mediaRecorderRef.current = null;
       setIsRecording(false);
       setRecordingMode(null);
-      setIsLockedRecording(false);
+      setRecordingLocked(false);
       setIsSwitchingCamera(false);
       resetRecordingClock();
       resetGestureState();
@@ -822,13 +838,17 @@ const MessageBar = () => {
 
     await startRecording(preferredRecordingMode);
 
-    if (!holdToRecordRef.current && mediaRecorderRef.current && !isLockedRecording) {
+    if (
+      !holdToRecordRef.current &&
+      mediaRecorderRef.current &&
+      !isLockedRecordingRef.current
+    ) {
       stopRecording();
     }
   };
 
   const handleRecordPointerMove = (event) => {
-    if (!isRecording || isLockedRecording) return;
+    if (!isRecording || isLockedRecordingRef.current) return;
     if (!holdToRecordRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
 
@@ -837,7 +857,7 @@ const MessageBar = () => {
     setLockGuideProgress(progress);
 
     if (deltaY >= LOCK_THRESHOLD_PX) {
-      setIsLockedRecording(true);
+      setRecordingLocked(true);
       setLockGuideProgress(1);
       holdToRecordRef.current = false;
 
@@ -860,7 +880,7 @@ const MessageBar = () => {
 
     activePointerIdRef.current = null;
 
-    if (isLockedRecording) {
+    if (isLockedRecordingRef.current) {
       holdToRecordRef.current = false;
       return;
     }
@@ -890,7 +910,7 @@ const MessageBar = () => {
 
     activePointerIdRef.current = null;
 
-    if (isLockedRecording) {
+    if (isLockedRecordingRef.current) {
       holdToRecordRef.current = false;
       return;
     }
