@@ -243,7 +243,7 @@ const MessageContainer = () => {
     if (isVideoNoteMessage(message)) {
       return (
         <div className="flex flex-col items-center gap-3">
-          <div className="h-36 w-36 md:h-44 md:w-44 rounded-full overflow-hidden bg-black">
+          <div className="h-56 w-56 md:h-66 md:w-66 rounded-full overflow-hidden bg-black">
             <video
               src={getProtectedFileUrl(message._id)}
               controls

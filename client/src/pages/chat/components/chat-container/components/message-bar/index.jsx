@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { GrAttachment } from "react-icons/gr";
 import {
   IoCheckmark,
+  IoLockClosed,
   IoMic,
   IoSend,
   IoStopCircle,
@@ -19,10 +20,12 @@ import {
   IoVideocam,
 } from "react-icons/io5";
 import { RiEmojiStickerLine } from "react-icons/ri";
+import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const MAX_VIDEO_NOTE_SECONDS = 60;
 const RECORDER_MEDIA_OWNER = "message-recorder";
+const LOCK_THRESHOLD_PX = 70;
 
 const formatDuration = (totalSeconds = 0) => {
   const minutes = Math.floor(totalSeconds / 60);
@@ -56,14 +59,14 @@ const getExtensionFromMimeType = (mimeType = "") => {
   return "webm";
 };
 
-const getConstraintsForMode = (mode) => {
+const getConstraintsForMode = (mode, facingMode = "user") => {
   if (mode === "video-note") {
     return {
       audio: true,
       video: {
-        facingMode: "user",
-        width: { ideal: 480 },
-        height: { ideal: 480 },
+        facingMode: { ideal: facingMode },
+        width: { ideal: 720 },
+        height: { ideal: 720 },
         aspectRatio: 1,
       },
     };
@@ -85,8 +88,11 @@ const MessageBar = () => {
   const recordingTimerRef = useRef(null);
   const recordingSecondsRef = useRef(0);
   const discardOnStopRef = useRef(false);
+  const autoSendOnStopRef = useRef(false);
   const recordedPreviewUrlRef = useRef("");
   const holdToRecordRef = useRef(false);
+  const activePointerIdRef = useRef(null);
+  const pointerStartYRef = useRef(0);
 
   const socket = useSocket();
 
@@ -102,6 +108,7 @@ const MessageBar = () => {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   const [preferredRecordingMode, setPreferredRecordingMode] = useState("audio");
+  const [videoFacingMode, setVideoFacingMode] = useState("user");
   const [grantedMedia, setGrantedMedia] = useState({
     audio: false,
     video: false,
@@ -109,7 +116,10 @@ const MessageBar = () => {
 
   const [recordingMode, setRecordingMode] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isLockedRecording, setIsLockedRecording] = useState(false);
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [lockGuideProgress, setLockGuideProgress] = useState(0);
 
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [recordedPreviewUrl, setRecordedPreviewUrl] = useState("");
@@ -122,6 +132,8 @@ const MessageBar = () => {
 
   const isMediaDraftActive = isRecording || Boolean(recordedBlob);
   const hasTypedMessage = Boolean(message.trim());
+  const showLockGuide =
+    !hasTypedMessage && isRecording && !recordedBlob && !isSendingRecordedMedia;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -135,21 +147,12 @@ const MessageBar = () => {
   }, []);
 
   useEffect(() => {
-    if (
-      recordingMode === "video-note" &&
-      isRecording &&
-      videoPreviewRef.current &&
-      mediaStreamRef.current
-    ) {
-      videoPreviewRef.current.srcObject = mediaStreamRef.current;
-    }
-
     return () => {
       if (videoPreviewRef.current) {
         videoPreviewRef.current.srcObject = null;
       }
     };
-  }, [recordingMode, isRecording]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -172,6 +175,17 @@ const MessageBar = () => {
     };
   }, []);
 
+  const attachPreviewStream = async (stream) => {
+    if (!videoPreviewRef.current || !stream) return;
+
+    try {
+      videoPreviewRef.current.srcObject = stream;
+      await videoPreviewRef.current.play();
+    } catch (error) {
+      console.log("preview play error", error);
+    }
+  };
+
   const revokeRecordedPreviewUrl = () => {
     if (recordedPreviewUrlRef.current) {
       URL.revokeObjectURL(recordedPreviewUrlRef.current);
@@ -191,6 +205,13 @@ const MessageBar = () => {
     setRecordingSeconds(0);
   };
 
+  const resetGestureState = () => {
+    holdToRecordRef.current = false;
+    activePointerIdRef.current = null;
+    pointerStartYRef.current = 0;
+    setLockGuideProgress(0);
+  };
+
   const clearRecordedDraft = () => {
     revokeRecordedPreviewUrl();
     setRecordedBlob(null);
@@ -204,7 +225,12 @@ const MessageBar = () => {
     clearRecordedDraft();
     setRecordingMode(null);
     setIsRecording(false);
+    setIsLockedRecording(false);
+    setIsSwitchingCamera(false);
+    autoSendOnStopRef.current = false;
+    discardOnStopRef.current = false;
     resetRecordingClock();
+    resetGestureState();
   };
 
   const hasPermissionForMode = (mode) => {
@@ -215,9 +241,9 @@ const MessageBar = () => {
     return grantedMedia.audio;
   };
 
-  const requestMediaPermission = async (mode) => {
+  const requestMediaPermission = async (mode, facingMode = videoFacingMode) => {
     await warmupManagedMedia({
-      constraints: getConstraintsForMode(mode),
+      constraints: getConstraintsForMode(mode, facingMode),
     });
 
     setGrantedMedia((prev) => ({
@@ -244,6 +270,65 @@ const MessageBar = () => {
       }
     } catch (error) {
       console.log({ error });
+    }
+  };
+
+  const switchCameraDuringRecording = async () => {
+    if (
+      !isRecording ||
+      recordingMode !== "video-note" ||
+      !mediaStreamRef.current ||
+      isSwitchingCamera
+    ) {
+      return;
+    }
+
+    try {
+      setIsSwitchingCamera(true);
+
+      const nextFacingMode =
+        videoFacingMode === "user" ? "environment" : "user";
+
+      const replacementStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: nextFacingMode },
+          width: { ideal: 720 },
+          height: { ideal: 720 },
+          aspectRatio: 1,
+        },
+      });
+
+      const nextVideoTrack = replacementStream.getVideoTracks()[0];
+      if (!nextVideoTrack) {
+        throw new Error("New camera track was not created");
+      }
+
+      const currentStream = mediaStreamRef.current;
+      const oldVideoTracks = currentStream.getVideoTracks();
+
+      oldVideoTracks.forEach((track) => {
+        try {
+          currentStream.removeTrack(track);
+        } catch (error) {
+          console.log("remove old track error", error);
+        }
+
+        try {
+          track.stop();
+        } catch (error) {
+          console.log("stop old track error", error);
+        }
+      });
+
+      currentStream.addTrack(nextVideoTrack);
+      await attachPreviewStream(currentStream);
+      setVideoFacingMode(nextFacingMode);
+    } catch (error) {
+      console.log({ error });
+      toast.error("Не удалось переключить камеру во время записи");
+    } finally {
+      setIsSwitchingCamera(false);
     }
   };
 
@@ -303,6 +388,43 @@ const MessageBar = () => {
     } finally {
       setIsUploading(false);
       setFileUploadProgress(0);
+    }
+  };
+
+  const uploadAndEmitRecordedMedia = async ({
+    blob,
+    mode,
+    mimeType,
+    duration,
+  }) => {
+    setIsSendingRecordedMedia(true);
+
+    try {
+      const extension = getExtensionFromMimeType(mimeType);
+
+      const fileName =
+        mode === "audio"
+          ? `voice-message-${Date.now()}.${extension}`
+          : `video-note-${Date.now()}.${extension}`;
+
+      const file = new File([blob], fileName, { type: mimeType });
+      const response = await uploadSelectedFile(file);
+
+      emitSocketMessage({
+        messageType: mode,
+        content: undefined,
+        fileUrl: response.filePath,
+        mimeType: response.mimeType,
+        duration,
+      });
+
+      return true;
+    } catch (error) {
+      console.log({ error });
+      toast.error("Не удалось отправить медиа");
+      return false;
+    } finally {
+      setIsSendingRecordedMedia(false);
     }
   };
 
@@ -370,7 +492,19 @@ const MessageBar = () => {
 
   const cancelActiveRecording = () => {
     discardOnStopRef.current = true;
-    holdToRecordRef.current = false;
+    autoSendOnStopRef.current = false;
+    stopRecording();
+  };
+
+  const stopLockedRecordingToPreview = () => {
+    autoSendOnStopRef.current = false;
+    discardOnStopRef.current = false;
+    stopRecording();
+  };
+
+  const sendLockedRecording = () => {
+    autoSendOnStopRef.current = true;
+    discardOnStopRef.current = false;
     stopRecording();
   };
 
@@ -389,7 +523,7 @@ const MessageBar = () => {
       }
 
       const isVideoMode = mode === "video-note";
-      const constraints = getConstraintsForMode(mode);
+      const constraints = getConstraintsForMode(mode, videoFacingMode);
 
       const mimeCandidates = isVideoMode
         ? [
@@ -410,10 +544,14 @@ const MessageBar = () => {
 
       recordedChunksRef.current = [];
       discardOnStopRef.current = false;
+      autoSendOnStopRef.current = false;
       clearRecordedDraft();
       setRecordingMode(mode);
       setIsRecording(true);
+      setIsLockedRecording(false);
+      setIsSwitchingCamera(false);
       resetRecordingClock();
+      setLockGuideProgress(0);
 
       const stream = await requestManagedUserMedia({
         owner: RECORDER_MEDIA_OWNER,
@@ -422,6 +560,10 @@ const MessageBar = () => {
       });
 
       mediaStreamRef.current = stream;
+
+      if (mode === "video-note") {
+        await attachPreviewStream(stream);
+      }
 
       const recorder = selectedMimeType
         ? new MediaRecorder(stream, { mimeType: selectedMimeType })
@@ -440,6 +582,7 @@ const MessageBar = () => {
         const finalMimeType =
           recorder.mimeType || selectedMimeType || fallbackMimeType;
         const shouldDiscard = discardOnStopRef.current;
+        const shouldAutoSend = autoSendOnStopRef.current;
 
         stopRecordingTimer();
 
@@ -450,6 +593,10 @@ const MessageBar = () => {
         mediaStreamRef.current = null;
         mediaRecorderRef.current = null;
         discardOnStopRef.current = false;
+        autoSendOnStopRef.current = false;
+        setIsLockedRecording(false);
+        setIsSwitchingCamera(false);
+        resetGestureState();
 
         releaseManagedOwner(RECORDER_MEDIA_OWNER);
 
@@ -484,6 +631,26 @@ const MessageBar = () => {
           return;
         }
 
+        if (shouldAutoSend) {
+          void (async () => {
+            const success = await uploadAndEmitRecordedMedia({
+              blob,
+              mode,
+              mimeType: finalMimeType,
+              duration,
+            });
+
+            if (success) {
+              clearRecordedDraft();
+              setRecordingMode(null);
+              resetRecordingClock();
+              setIsRecording(false);
+            }
+          })();
+
+          return;
+        }
+
         revokeRecordedPreviewUrl();
         const nextPreviewUrl = URL.createObjectURL(blob);
         recordedPreviewUrlRef.current = nextPreviewUrl;
@@ -506,7 +673,7 @@ const MessageBar = () => {
           mode === "video-note" &&
           recordingSecondsRef.current >= MAX_VIDEO_NOTE_SECONDS
         ) {
-          holdToRecordRef.current = false;
+          autoSendOnStopRef.current = false;
           stopRecording();
         }
       }, 1000);
@@ -522,7 +689,10 @@ const MessageBar = () => {
       mediaRecorderRef.current = null;
       setIsRecording(false);
       setRecordingMode(null);
+      setIsLockedRecording(false);
+      setIsSwitchingCamera(false);
       resetRecordingClock();
+      resetGestureState();
       releaseManagedOwner(RECORDER_MEDIA_OWNER);
       toast.error("Не удалось получить доступ к микрофону или камере");
     }
@@ -532,35 +702,21 @@ const MessageBar = () => {
     try {
       if (!recordedBlob || !recordingMode) return;
 
-      setIsSendingRecordedMedia(true);
-
-      const mimeType =
-        recordedMimeType ||
-        recordedBlob.type ||
-        (recordingMode === "audio" ? "audio/webm" : "video/webm");
-
-      const extension = getExtensionFromMimeType(mimeType);
-
-      const fileName =
-        recordingMode === "audio"
-          ? `voice-message-${Date.now()}.${extension}`
-          : `video-note-${Date.now()}.${extension}`;
-
-      const file = new File([recordedBlob], fileName, { type: mimeType });
-      const response = await uploadSelectedFile(file);
-
-      emitSocketMessage({
-        messageType: recordingMode,
-        content: undefined,
-        fileUrl: response.filePath,
-        mimeType: response.mimeType,
+      const success = await uploadAndEmitRecordedMedia({
+        blob: recordedBlob,
+        mode: recordingMode,
+        mimeType:
+          recordedMimeType ||
+          recordedBlob.type ||
+          (recordingMode === "audio" ? "audio/webm" : "video/webm"),
         duration: recordedDuration || recordingSeconds || 0,
       });
 
-      discardRecordedMedia();
+      if (success) {
+        discardRecordedMedia();
+      }
     } catch (error) {
       console.log({ error });
-      setIsSendingRecordedMedia(false);
       toast.error("Не удалось отправить медиа");
     }
   };
@@ -596,6 +752,9 @@ const MessageBar = () => {
     }
 
     holdToRecordRef.current = true;
+    activePointerIdRef.current = event.pointerId;
+    pointerStartYRef.current = event.clientY;
+    setLockGuideProgress(0);
 
     try {
       event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -605,21 +764,52 @@ const MessageBar = () => {
 
     await startRecording(preferredRecordingMode);
 
-    if (!holdToRecordRef.current && mediaRecorderRef.current) {
+    if (!holdToRecordRef.current && mediaRecorderRef.current && !isLockedRecording) {
       stopRecording();
     }
   };
 
-  const handleRecordPointerUp = (event) => {
+  const handleRecordPointerMove = (event) => {
+    if (!isRecording || isLockedRecording) return;
     if (!holdToRecordRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
 
-    holdToRecordRef.current = false;
+    const deltaY = pointerStartYRef.current - event.clientY;
+    const progress = Math.max(0, Math.min(deltaY / LOCK_THRESHOLD_PX, 1));
+    setLockGuideProgress(progress);
+
+    if (deltaY >= LOCK_THRESHOLD_PX) {
+      setIsLockedRecording(true);
+      setLockGuideProgress(1);
+      holdToRecordRef.current = false;
+
+      try {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+      } catch (error) {
+        // ignore
+      }
+    }
+  };
+
+  const handleRecordPointerUp = (event) => {
+    if (activePointerIdRef.current !== event.pointerId) return;
 
     try {
       event.currentTarget.releasePointerCapture?.(event.pointerId);
     } catch (error) {
       // ignore
     }
+
+    activePointerIdRef.current = null;
+
+    if (isLockedRecording) {
+      holdToRecordRef.current = false;
+      return;
+    }
+
+    if (!holdToRecordRef.current) return;
+
+    holdToRecordRef.current = false;
 
     if (isRecording) {
       stopRecording();
@@ -627,13 +817,27 @@ const MessageBar = () => {
   };
 
   const handleRecordPointerCancel = (event) => {
-    holdToRecordRef.current = false;
+    if (
+      activePointerIdRef.current !== null &&
+      activePointerIdRef.current !== event.pointerId
+    ) {
+      return;
+    }
 
     try {
       event.currentTarget.releasePointerCapture?.(event.pointerId);
     } catch (error) {
       // ignore
     }
+
+    activePointerIdRef.current = null;
+
+    if (isLockedRecording) {
+      holdToRecordRef.current = false;
+      return;
+    }
+
+    holdToRecordRef.current = false;
 
     if (isRecording) {
       stopRecording();
@@ -648,60 +852,172 @@ const MessageBar = () => {
     );
   };
 
+  const renderRecordingHeader = () => {
+    if (recordingMode === "video-note") {
+      return "Идет запись видеосообщения";
+    }
+
+    return "Идет запись голосового сообщения";
+  };
+
+  const renderVideoRecordingPanel = () => {
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-56 w-56 md:h-72 md:w-72 rounded-full overflow-hidden bg-black shadow-lg border border-white/10">
+          <video
+            ref={videoPreviewRef}
+            autoPlay
+            muted
+            playsInline
+            className="h-full w-full object-cover"
+          />
+        </div>
+
+        <div className="text-center">
+          <div className="text-sm font-medium text-white">
+            {renderRecordingHeader()}
+          </div>
+
+          {!isLockedRecording ? (
+            <div className="mt-1 flex items-center justify-center gap-2 text-xs text-white/60">
+              <IoLockClosed className="text-sm" />
+              <span>Потяни вверх до замка · {formatDuration(recordingSeconds)}</span>
+            </div>
+          ) : (
+            <div className="mt-1 flex items-center justify-center gap-2 text-xs text-green-400">
+              <IoLockClosed className="text-sm" />
+              <span>Запись закреплена · {formatDuration(recordingSeconds)}</span>
+            </div>
+          )}
+
+          <div className="mt-2 text-[11px] text-white/45">
+            Камера: {videoFacingMode === "user" ? "фронтальная" : "задняя"}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 md:gap-3">
+          <button
+            type="button"
+            className="rounded-xl bg-white/5 p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white disabled:opacity-50"
+            onClick={switchCameraDuringRecording}
+            disabled={isSwitchingCamera}
+            title="Сменить камеру"
+          >
+            <RefreshCw
+              className={`h-5 w-5 ${isSwitchingCamera ? "animate-spin" : ""}`}
+            />
+          </button>
+
+          <button
+            type="button"
+            className="rounded-xl bg-white/5 p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white"
+            onClick={cancelActiveRecording}
+            title="Удалить запись"
+          >
+            <IoTrash className="text-xl" />
+          </button>
+
+          <button
+            type="button"
+            className="rounded-xl bg-red-500/15 p-3 text-red-400 transition-all hover:bg-red-500/25"
+            onClick={stopLockedRecordingToPreview}
+            title="Остановить запись"
+          >
+            <IoStopCircle className="text-xl" />
+          </button>
+
+          {isLockedRecording && (
+            <button
+              type="button"
+              className="rounded-xl bg-[#1fce4a] p-3 text-white transition-all hover:bg-[#1bda54ac] disabled:opacity-50"
+              onClick={sendLockedRecording}
+              disabled={isSendingRecordedMedia}
+              title="Остановить и отправить"
+            >
+              <IoSend className="text-xl" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAudioRecordingPanel = () => {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400 shrink-0">
+            <IoMic className="text-xl" />
+          </div>
+
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-white">
+              {renderRecordingHeader()}
+            </div>
+
+            {!isLockedRecording ? (
+              <div className="flex items-center gap-2 text-xs text-white/60">
+                <IoLockClosed className="text-sm" />
+                <span>
+                  Потяни вверх до замка · {formatDuration(recordingSeconds)}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-green-400">
+                <IoLockClosed className="text-sm" />
+                <span>
+                  Запись закреплена · {formatDuration(recordingSeconds)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-xl bg-white/5 p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white"
+            onClick={cancelActiveRecording}
+            title="Удалить запись"
+          >
+            <IoTrash className="text-xl" />
+          </button>
+
+          <button
+            type="button"
+            className="rounded-xl bg-red-500/15 p-3 text-red-400 transition-all hover:bg-red-500/25"
+            onClick={stopLockedRecordingToPreview}
+            title="Остановить запись"
+          >
+            <IoStopCircle className="text-xl" />
+          </button>
+
+          {isLockedRecording && (
+            <button
+              type="button"
+              className="rounded-xl bg-[#1fce4a] p-3 text-white transition-all hover:bg-[#1bda54ac] disabled:opacity-50"
+              onClick={sendLockedRecording}
+              disabled={isSendingRecordedMedia}
+              title="Остановить и отправить"
+            >
+              <IoSend className="text-xl" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="shrink-0 min-h-16 md:min-h-20 bg-[#1c1d25] pb-[env(safe-area-inset-bottom)] px-2 md:px-8 md:mb-6">
       {(isRecording || recordedBlob) && (
-        <div className="mb-3 rounded-2xl border border-white/10 bg-[#2a2b33] p-3">
+        <div className="mb-3 rounded-2xl border border-white/10 bg-[#2a2b33] p-3 md:p-4">
           {isRecording ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                {recordingMode === "video-note" ? (
-                  <div className="h-20 w-20 rounded-full overflow-hidden bg-black shrink-0">
-                    <video
-                      ref={videoPreviewRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400 shrink-0">
-                    <IoMic className="text-xl" />
-                  </div>
-                )}
-
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-white">
-                    {recordingMode === "audio"
-                      ? "Идет запись голосового сообщения"
-                      : "Идет запись видеосообщения"}
-                  </div>
-                  <div className="text-xs text-white/60">
-                    Отпусти кнопку, чтобы закончить ·{" "}
-                    {formatDuration(recordingSeconds)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl bg-white/5 p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white"
-                  onClick={cancelActiveRecording}
-                >
-                  <IoTrash className="text-xl" />
-                </button>
-
-                <button
-                  type="button"
-                  className="rounded-xl bg-red-500/15 p-3 text-red-400 transition-all hover:bg-red-500/25"
-                  onClick={stopRecording}
-                >
-                  <IoStopCircle className="text-xl" />
-                </button>
-              </div>
-            </div>
+            recordingMode === "video-note" ? (
+              renderVideoRecordingPanel()
+            ) : (
+              renderAudioRecordingPanel()
+            )
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -713,7 +1029,7 @@ const MessageBar = () => {
                     className="max-w-full w-[260px]"
                   />
                 ) : (
-                  <div className="h-24 w-24 rounded-full overflow-hidden bg-black shrink-0">
+                  <div className="h-56 w-56 md:h-66 md:w-6 rounded-full overflow-hidden bg-black shrink-0">
                     <video
                       src={recordedPreviewUrl}
                       controls
@@ -742,6 +1058,7 @@ const MessageBar = () => {
                   className="rounded-xl bg-white/5 p-3 text-white/70 transition-all hover:bg-white/10 hover:text-white"
                   onClick={discardRecordedMedia}
                   disabled={isSendingRecordedMedia}
+                  title="Удалить запись"
                 >
                   <IoTrash className="text-xl" />
                 </button>
@@ -751,6 +1068,7 @@ const MessageBar = () => {
                   className="rounded-xl bg-[#1fce4a] p-3 text-white transition-all hover:bg-[#1bda54ac] disabled:opacity-50"
                   onClick={sendRecordedMedia}
                   disabled={isSendingRecordedMedia}
+                  title="Отправить запись"
                 >
                   <IoCheckmark className="text-xl" />
                 </button>
@@ -843,22 +1161,54 @@ const MessageBar = () => {
             <IoSend className="text-2xl" />
           </button>
         ) : (
-          <button
-            className="bg-[#1fce4a] rounded-xl flex items-center justify-center md:p-5 p-3 focus:border-none hover:bg-[#1bda54ac] focus:bg-[#1bda54ac] focus:outline-none focus:text-white duration-200 transition-all disabled:opacity-50 active:scale-95 touch-none"
-            type="button"
-            onPointerDown={handleRecordPointerDown}
-            onPointerUp={handleRecordPointerUp}
-            onPointerCancel={handleRecordPointerCancel}
-            onContextMenu={(e) => e.preventDefault()}
-            disabled={isMediaDraftActive || isSendingRecordedMedia}
-            title={
-              preferredRecordingMode === "audio"
-                ? "Зажми для записи голосового сообщения"
-                : "Зажми для записи видеосообщения"
-            }
-          >
-            {renderModeIcon("text-2xl")}
-          </button>
+          <div className="relative flex items-end justify-center w-[56px] md:w-[72px]">
+            {showLockGuide && (
+              <div
+                className="pointer-events-none absolute bottom-[72px] md:bottom-[82px] inset-x-0 flex flex-col items-center"
+                style={{
+                  transform: `translateY(-${Math.round(
+                    lockGuideProgress * 16
+                  )}px)`,
+                }}
+              >
+                <div
+                  className={`h-12 w-12 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all duration-150 ${
+                    isLockedRecording
+                      ? "border-green-400 bg-green-500/20 text-green-400"
+                      : lockGuideProgress > 0.15
+                      ? "border-white/50 bg-white/10 text-white"
+                      : "border-white/20 bg-[#2a2b33]/90 text-white/60"
+                  }`}
+                >
+                  <IoLockClosed className="text-xl" />
+                </div>
+              </div>
+            )}
+
+            <button
+              className={`bg-[#1fce4a] rounded-xl flex items-center justify-center md:p-5 p-3 focus:border-none hover:bg-[#1bda54ac] focus:bg-[#1bda54ac] focus:outline-none focus:text-white duration-200 transition-all disabled:opacity-50 active:scale-95 touch-none ${
+                isLockedRecording ? "ring-2 ring-green-400/60" : ""
+              }`}
+              type="button"
+              onPointerDown={handleRecordPointerDown}
+              onPointerMove={handleRecordPointerMove}
+              onPointerUp={handleRecordPointerUp}
+              onPointerCancel={handleRecordPointerCancel}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={isMediaDraftActive || isSendingRecordedMedia}
+              title={
+                preferredRecordingMode === "audio"
+                  ? "Зажми для записи голосового сообщения"
+                  : "Зажми для записи видеосообщения"
+              }
+            >
+              {isLockedRecording ? (
+                <IoLockClosed className="text-2xl" />
+              ) : (
+                renderModeIcon("text-2xl")
+              )}
+            </button>
+          </div>
         )}
       </div>
     </div>
