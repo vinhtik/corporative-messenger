@@ -1,6 +1,10 @@
 import { useSocket } from "@/context/SocketContext";
 import { apiClient } from "@/lib/api-client";
 import {
+  getPreferredVideoConstraints,
+  rememberCameraFromStream,
+} from "@/lib/camera-source";
+import {
   releaseManagedOwner,
   requestManagedUserMedia,
   warmupManagedMedia,
@@ -26,6 +30,8 @@ import { toast } from "sonner";
 const MAX_VIDEO_NOTE_SECONDS = 60;
 const RECORDER_MEDIA_OWNER = "message-recorder";
 const LOCK_THRESHOLD_PX = 70;
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const formatDuration = (totalSeconds = 0) => {
   const minutes = Math.floor(totalSeconds / 60);
@@ -59,16 +65,28 @@ const getExtensionFromMimeType = (mimeType = "") => {
   return "webm";
 };
 
-const getConstraintsForMode = (mode, facingMode = "user") => {
+const isCameraBusyError = (error) => {
+  const text = `${error?.name || ""} ${error?.message || ""}`.toLowerCase();
+
+  return (
+    text.includes("failed to allocate videosource") ||
+    text.includes("notreadable") ||
+    text.includes("device in use") ||
+    text.includes("could not start video source") ||
+    text.includes("starting video failed")
+  );
+};
+
+const buildConstraintsForMode = async (mode, facingMode = "user") => {
   if (mode === "video-note") {
     return {
       audio: true,
-      video: {
-        facingMode: { ideal: facingMode },
-        width: { ideal: 720 },
-        height: { ideal: 720 },
+      video: await getPreferredVideoConstraints({
+        facingMode,
+        width: 720,
+        height: 720,
         aspectRatio: 1,
-      },
+      }),
     };
   }
 
@@ -242,8 +260,10 @@ const MessageBar = () => {
   };
 
   const requestMediaPermission = async (mode, facingMode = videoFacingMode) => {
+    const constraints = await buildConstraintsForMode(mode, facingMode);
+
     await warmupManagedMedia({
-      constraints: getConstraintsForMode(mode, facingMode),
+      constraints,
     });
 
     setGrantedMedia((prev) => ({
@@ -291,13 +311,15 @@ const MessageBar = () => {
 
       const replacementStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: {
-          facingMode: { ideal: nextFacingMode },
-          width: { ideal: 720 },
-          height: { ideal: 720 },
+        video: await getPreferredVideoConstraints({
+          facingMode: nextFacingMode,
+          width: 720,
+          height: 720,
           aspectRatio: 1,
-        },
+        }),
       });
+
+      rememberCameraFromStream(replacementStream);
 
       const nextVideoTrack = replacementStream.getVideoTracks()[0];
       if (!nextVideoTrack) {
@@ -326,6 +348,11 @@ const MessageBar = () => {
       setVideoFacingMode(nextFacingMode);
     } catch (error) {
       console.log({ error });
+
+      if (isCameraBusyError(error)) {
+        await wait(500);
+      }
+
       toast.error("Не удалось переключить камеру во время записи");
     } finally {
       setIsSwitchingCamera(false);
@@ -523,7 +550,7 @@ const MessageBar = () => {
       }
 
       const isVideoMode = mode === "video-note";
-      const constraints = getConstraintsForMode(mode, videoFacingMode);
+      const constraints = await buildConstraintsForMode(mode, videoFacingMode);
 
       const mimeCandidates = isVideoMode
         ? [
@@ -560,6 +587,7 @@ const MessageBar = () => {
       });
 
       mediaStreamRef.current = stream;
+      rememberCameraFromStream(stream);
 
       if (mode === "video-note") {
         await attachPreviewStream(stream);
@@ -1029,7 +1057,7 @@ const MessageBar = () => {
                     className="max-w-full w-[260px]"
                   />
                 ) : (
-                  <div className="h-56 w-56 md:h-66 md:w-6 rounded-full overflow-hidden bg-black shrink-0">
+                  <div className="h-56 w-56 md:h-66 md:w-66 rounded-full overflow-hidden bg-black shrink-0">
                     <video
                       src={recordedPreviewUrl}
                       controls

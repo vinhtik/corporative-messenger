@@ -8,6 +8,7 @@ import {
 } from "@livekit/components-react";
 import { useSocket } from "@/context/SocketContext";
 import { apiClient } from "@/lib/api-client";
+import { getPreferredLiveKitCameraOptions } from "@/lib/camera-source";
 import {
   registerManagedExternalOwner,
   releaseManagedOwner,
@@ -251,6 +252,11 @@ const isCameraBusyError = (error) => {
     text.includes("could not start video source") ||
     text.includes("starting video failed")
   );
+};
+
+const enablePreferredCamera = async (room) => {
+  const cameraOptions = await getPreferredLiveKitCameraOptions();
+  await room.localParticipant.setCameraEnabled(true, cameraOptions);
 };
 
 const CallTile = ({ trackRef, isFocused = false, onClick }) => {
@@ -666,7 +672,7 @@ const CallPage = () => {
 
       if (isCameraBusyError(cameraError)) {
         toast.error(
-          "Камера занята или не успела освободиться. Закрой другие вкладки и приложения с камерой."
+          "Камера занята или не смогла открыться. Проверь системную камеру или переключи устройство."
         );
       } else {
         toast.error(
@@ -770,7 +776,7 @@ const CallPage = () => {
         },
       });
 
-      await room.localParticipant.setCameraEnabled(true);
+      await enablePreferredCamera(room);
       syncLocalMediaState();
       await syncCallOwnerRegistration();
     } catch (error) {
@@ -781,8 +787,7 @@ const CallPage = () => {
       if (isCameraBusyError(actualError)) {
         try {
           await forceReleaseCamera(room);
-          await wait(800);
-          await room.localParticipant.setCameraEnabled(true);
+          await enablePreferredCamera(room);
           syncLocalMediaState();
           await syncCallOwnerRegistration();
           toast.success("Камера была перезапущена.");
@@ -790,7 +795,7 @@ const CallPage = () => {
         } catch (retryError) {
           console.log("toggleCamera retry error", retryError);
           toast.error(
-            "Камера занята или не успела освободиться. Закрой другие вкладки и приложения с камерой и попробуй ещё раз."
+            "Не удалось включить камеру. Попробуй другую системную камеру или закрой приложения, которые её используют."
           );
           syncLocalMediaState();
           await syncCallOwnerRegistration();
