@@ -96,21 +96,21 @@ const CreateChannel = () => {
         <Tooltip>
           <TooltipTrigger>
             <FaPlus
-              className="text-neutral-400 font-light text-opacity-90 text-start hover:text-neutral-100 cursor-pointer transition-all duration-200"
+              className="text-muted-foreground font-light text-opacity-90 text-start hover:text-foreground cursor-pointer transition-all duration-200"
               onClick={() => setNewChannelModal(true)}
             />
           </TooltipTrigger>
-          <TooltipContent className="bg-[#1c1b1e] border-none mb-2 p-3 text-white">
+          <TooltipContent className="bg-popover border-none mb-2 p-3 text-popover-foreground">
             Новая группа
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
       <Dialog open={newChannelModal} onOpenChange={setNewChannelModal}>
-        <DialogContent className="bg-[#181920] border-none text-white w-[400px] h-[400px] flex flex-col">
+        <DialogContent className="bg-card border border-border text-card-foreground w-[400px] h-[400px] flex flex-col">
           <DialogHeader>
             <DialogTitle>Создание группы</DialogTitle>
-            <DialogDescription className="text-white/50">
+            <DialogDescription className="text-muted-foreground">
               В группу можно приглашать только друзей.
             </DialogDescription>
           </DialogHeader>
@@ -118,7 +118,7 @@ const CreateChannel = () => {
           <div>
             <Input
               placeholder="Название группы"
-              className="rounded-lg p-6 bg-[#2c2e3b] border-none"
+              className="rounded-lg p-6 bg-background border-border"
               onChange={(e) => setChannelName(e.target.value)}
               value={channelName}
               disabled={isBusy}
@@ -126,13 +126,13 @@ const CreateChannel = () => {
           </div>
 
           <MultipleSelector
-            className="rounded-lg bg-[#2c2e3b] border-none py-2 text-white"
+            className="rounded-lg bg-background border-border py-2 text-foreground"
             options={friendOptions}
             placeholder="Выбрать друзей"
             value={selectedFriends}
             onChange={setSelectedFriends}
             emptyIndicator={
-              <p className="text-center text-lg leading-10 text-gray-600">
+              <p className="text-center text-lg leading-10 text-muted-foreground">
                 Нет доступных друзей
               </p>
             }

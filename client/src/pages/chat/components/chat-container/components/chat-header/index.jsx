@@ -74,7 +74,7 @@ const roleBadgeClass = (role) => {
     return "bg-blue-500/20 text-blue-300 border-blue-500/30";
   }
 
-  return "bg-white/10 text-white/70 border-white/10";
+  return "bg-muted text-muted-foreground border-border";
 };
 
 const sortMembersByRole = (members = []) => {
@@ -488,7 +488,7 @@ const ChatHeader = () => {
 
   return (
     <>
-      <div className="h-[10vh] border-b-2 border-[#2f303b] flex items-center justify-between px-20">
+      <div className="h-[10vh] border-b-2 border-border bg-background flex items-center justify-between px-20">
         <div className="flex gap-5 items-center w-full justify-between">
           <div className="flex gap-3 items-center justify-center">
             <button
@@ -527,7 +527,7 @@ const ChatHeader = () => {
                   )}
                 </Avatar>
               ) : (
-                <div className="bg-[#ffffff22] h-10 w-10 flex items-center justify-center rounded-full">
+                <div className="bg-muted text-muted-foreground h-10 w-10 flex items-center justify-center rounded-full">
                   #
                 </div>
               )}
@@ -557,7 +557,7 @@ const ChatHeader = () => {
               </div>
 
               {selectedChatType === "channel" && (
-                <div className="text-xs text-white/50">
+                <div className="text-xs text-muted-foreground">
                   {selectedChatData?.memberCount || memberDetails.length || 0} участников
                 </div>
               )}
@@ -568,7 +568,7 @@ const ChatHeader = () => {
             {selectedChatType === "channel" && (
               <button
                 type="button"
-                className="text-neutral-400 hover:text-white duration-200 transition-all rounded-full p-2 hover:bg-[#2a2c37]"
+                className="text-muted-foreground hover:text-foreground duration-200 transition-all rounded-full p-2"
                 onClick={() => setChannelDialogOpen(true)}
                 title="Управление группой"
               >
@@ -578,7 +578,7 @@ const ChatHeader = () => {
 
             <button
               type="button"
-              className="text-neutral-400 hover:text-white duration-200 transition-all rounded-full p-2 hover:bg-[#2a2c37]"
+              className="text-muted-foreground hover:text-foreground duration-200 transition-all rounded-full p-2"
               onClick={startCall}
               title="Звонок"
             >
@@ -586,7 +586,7 @@ const ChatHeader = () => {
             </button>
 
             <button
-              className="text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-200 transition-all"
+              className="text-muted-foreground focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all"
               onClick={closeChat}
             >
               <RiCloseFill className="text-3xl" />
@@ -596,16 +596,16 @@ const ChatHeader = () => {
       </div>
 
       <Dialog open={channelDialogOpen} onOpenChange={setChannelDialogOpen}>
-        <DialogContent className="bg-[#181920] border-none text-white w-[720px] max-w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="bg-card border border-border text-card-foreground w-[720px] max-w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Управление группой</DialogTitle>
-            <DialogDescription className="text-white/50">
+            <DialogDescription className="text-muted-foreground">
               Здесь можно менять название, добавлять друзей в группу и управлять ролями.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-5 overflow-y-auto scrollbar-hidden pr-1">
-            <div className="rounded-xl bg-[#2c2e3b] p-4">
+            <div className="rounded-xl bg-muted p-4">
               <div className="text-sm text-white/60 mb-2">Название группы</div>
 
               <div className="flex gap-2">
@@ -613,7 +613,7 @@ const ChatHeader = () => {
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
                   disabled={!canRenameChannel || isBusy}
-                  className="rounded-lg bg-[#1f212b] border-none"
+                  className="rounded-lg bg-background border border-border"
                   placeholder="Название группы"
                 />
 
@@ -631,12 +631,12 @@ const ChatHeader = () => {
             </div>
 
             {canAddMembers && (
-              <div className="rounded-xl bg-[#2c2e3b] p-4">
+              <div className="rounded-xl bg-muted p-4">
                 <div className="text-sm text-white/60 mb-2">Добавить друзей</div>
 
                 <div className="flex flex-col gap-3">
                   <MultipleSelector
-                    className="rounded-lg bg-[#1f212b] border-none py-2 text-white"
+                    className="rounded-lg bg-background border border-border py-2 text-white"
                     options={availableFriends}
                     placeholder="Выбрать друзей"
                     value={selectedFriends}
@@ -660,7 +660,7 @@ const ChatHeader = () => {
               </div>
             )}
 
-            <div className="rounded-xl bg-[#2c2e3b] p-4">
+            <div className="rounded-xl bg-muted p-4">
               <div className="text-sm text-white/60 mb-3">Участники</div>
 
               <div className="flex flex-col gap-3">
@@ -673,7 +673,7 @@ const ChatHeader = () => {
                   return (
                     <div
                       key={user?._id}
-                      className="bg-[#1f212b] rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+                      className="bg-background border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-4"
                     >
                       <button
                         type="button"
@@ -758,8 +758,8 @@ const ChatHeader = () => {
             </div>
 
             {canDeleteChannel && (
-              <div className="rounded-xl bg-[#2c2e3b] p-4">
-                <div className="text-sm text-white/60 mb-3">Опасная зона</div>
+              <div className="rounded-xl bg-muted border border-border p-4">
+                <div className="text-sm text-muted-foreground mb-3">Опасная зона</div>
 
                 <Button
                   variant="destructive"

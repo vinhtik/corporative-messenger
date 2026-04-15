@@ -179,7 +179,7 @@ const MessageContainer = () => {
   const renderDownloadButton = (message) => {
     return (
       <span
-        className="bg-black/20 p-2 text-xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200 shrink-0"
+        className="bg-card/80 text-card-foreground border border-border p-2 text-xl rounded-full hover:bg-accent cursor-pointer transition-all duration-200 shrink-0"
         onClick={() => downloadFile(message)}
       >
         {downloadingFile === message._id ? (
@@ -274,8 +274,8 @@ const MessageContainer = () => {
   const getBubbleClasses = (isOwnMessage) => {
     return `${
       isOwnMessage
-        ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50 rounded-l-2xl"
-        : "bg-[#8417ff]/5 text-white/80 border-white/20 rounded-r-2xl"
+        ? "bg-primary/50 text-primary-foreground/90 border-primary/50 rounded-l-2xl"
+        : "bg-card/90 text-card-foreground/80 border-border/20 rounded-r-2xl"
     } border w-fit p-2 my-1 max-w-[80%] md:max-w-[50%] break-words rounded-t-2xl text-left`;
   };
 
@@ -290,7 +290,7 @@ const MessageContainer = () => {
       return (
         <div key={message._id || index}>
           {showDate && (
-            <div className="text-center text-gray-500 my-2">
+            <div className="text-center text-muted-foreground my-2">
               {moment(message.timestamp).format("LL")}
             </div>
           )}
@@ -312,7 +312,7 @@ const MessageContainer = () => {
           {renderMessageContent(message)}
         </div>
 
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-muted-foreground">
           {moment(message.timestamp).format("LT")}
         </div>
       </div>
@@ -349,16 +349,16 @@ const MessageContainer = () => {
               </AvatarFallback>
             </Avatar>
 
-            <span className="text-sm text-white/60">
+            <span className="text-sm text-muted-foreground">
               {`${message.sender?.firstName || ""} ${message.sender?.lastName || ""}`.trim()}
             </span>
 
-            <span className="text-xs text-white/60">
+            <span className="text-xs text-muted-foreground">
               {moment(message.timestamp).format("LT")}
             </span>
           </div>
         ) : (
-          <div className="text-xs text-white/60 mt-1">
+          <div className="text-xs text-muted-foreground mt-1">
             {moment(message.timestamp).format("LT")}
           </div>
         )}
@@ -367,7 +367,7 @@ const MessageContainer = () => {
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hidden p-4 md:px-8 md:w-[65vw] lg:w-[70vw] xl:w-[80vw] w-full">
+    <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hidden p-4 md:px-8 md:w-[65vw] lg:w-[70vw] xl:w-[80vw] w-full bg-background">
       {renderMessages()}
       <div ref={scrollRef} />
 
@@ -383,7 +383,7 @@ const MessageContainer = () => {
 
           <div className="flex gap-5 fixed top-0 right-0 m-5">
             <button
-              className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
+              className="bg-card/70 p-3 text-2xl rounded-full hover:bg-accent cursor-pointer transition-all duration-200"
               onClick={() => {
                 const message = selectedChatMessages.find(
                   (item) => item._id === imageMessageId
@@ -401,7 +401,7 @@ const MessageContainer = () => {
             </button>
 
             <button
-              className="bg-black/20 p-3 text-2xl rounded-full hover:bg-black/50 cursor-pointer transition-all duration-200"
+              className="bg-card/80 text-card-foreground border border-border p-3 text-2xl rounded-full hover:bg-accent cursor-pointer transition-all duration-200"
               onClick={() => {
                 setShowImage(false);
                 setImageMessageId(null);

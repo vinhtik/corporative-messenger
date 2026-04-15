@@ -1,0 +1,91 @@
+import { buildThemePalette } from "./theme-utils";
+
+export const themePresets = {
+  light: {
+    default: buildThemePalette({
+      background: "#ffffff",
+      foreground: "#111827",
+      card: "#ffffff",
+      primary: "#2563eb",
+      secondary: "#e5e7eb",
+      accent: "#dbeafe",
+      muted: "#f3f4f6",
+      border: "#d1d5db",
+      input: "#e5e7eb",
+      ring: "#60a5fa",
+      sidebar: "#f8fafc",
+    }),
+
+    sky: buildThemePalette({
+      background: "#f7fbff",
+      foreground: "#0f172a",
+      card: "#ffffff",
+      primary: "#0ea5e9",
+      secondary: "#e0f2fe",
+      accent: "#bae6fd",
+      muted: "#eff6ff",
+      border: "#cbd5e1",
+      input: "#dbeafe",
+      ring: "#38bdf8",
+      sidebar: "#eff6ff",
+    }),
+
+    rose: buildThemePalette({
+      background: "#fff8fb",
+      foreground: "#3f1d2e",
+      card: "#ffffff",
+      primary: "#e11d48",
+      secondary: "#ffe4e6",
+      accent: "#fecdd3",
+      muted: "#fff1f2",
+      border: "#fbcfe8",
+      input: "#ffe4e6",
+      ring: "#fb7185",
+      sidebar: "#fff1f2",
+    }),
+  },
+
+  dark: {
+    default: buildThemePalette({
+      background: "#111827",
+      foreground: "#f9fafb",
+      card: "#1f2937",
+      primary: "#60a5fa",
+      secondary: "#374151",
+      accent: "#2563eb",
+      muted: "#1f2937",
+      border: "#374151",
+      input: "#374151",
+      ring: "#93c5fd",
+      sidebar: "#0f172a",
+    }),
+
+    midnight: buildThemePalette({
+      background: "#081120",
+      foreground: "#e6f0ff",
+      card: "#0f172a",
+      primary: "#3b82f6",
+      secondary: "#172554",
+      accent: "#2563eb",
+      muted: "#0b1324",
+      border: "#22304b",
+      input: "#182338",
+      ring: "#60a5fa",
+      sidebar: "#0b1220",
+    }),
+
+    emerald: buildThemePalette({
+      background: "#081510",
+      foreground: "#ecfdf5",
+      card: "#0f1f18",
+      primary: "#10b981",
+      secondary: "#163228",
+      accent: "#059669",
+      muted: "#0c1813",
+      border: "#234336",
+      input: "#173026",
+      ring: "#34d399",
+      sidebar: "#0b1712",
+    }),
+  },
+};

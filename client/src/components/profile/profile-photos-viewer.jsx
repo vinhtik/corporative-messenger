@@ -69,22 +69,22 @@ const ProfilePhotosViewer = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#181920] border-none text-white w-[95vw] max-w-5xl p-0 overflow-hidden">
+      <DialogContent className="bg-card border border-border text-card-foreground w-[95vw] max-w-5xl p-0 overflow-hidden">
         <div className="relative min-h-[70vh] flex flex-col">
 
           {!currentPhoto ? (
-            <div className="flex-1 flex items-center justify-center text-white/40">
+            <div className="flex-1 flex items-center justify-center text-muted-foreground">
               Фотографий нет
             </div>
           ) : (
             <>
-              <div className="relative flex-1 flex items-center justify-center bg-black/40 px-4 py-6">
+              <div className="relative flex-1 flex items-center justify-center bg-muted/40 px-4 py-6">
                 {photos.length > 1 && (
                   <Button
                     type="button"
                     size="icon"
                     onClick={showPrev}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-card/90 hover:bg-accent"
                   >
                     <FaChevronLeft />
                   </Button>
@@ -97,7 +97,7 @@ const ProfilePhotosViewer = ({
                     className="max-h-[52vh] max-w-full object-contain rounded-2xl"
                   />
 
-                  <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-white/70 px-3 text-center">
+                  <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground px-3 text-center">
                     <span>
                       {currentIndex + 1} / {photos.length}
                     </span>
@@ -119,7 +119,7 @@ const ProfilePhotosViewer = ({
                         className={
                           currentPhoto.isAvatar
                             ? "bg-emerald-700 hover:bg-emerald-700"
-                            : "bg-[#3a3d4c] hover:bg-[#4b4f62]"
+                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                         }
                       >
                         <FaStar className="mr-2" />
@@ -145,14 +145,14 @@ const ProfilePhotosViewer = ({
                     type="button"
                     size="icon"
                     onClick={showNext}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 hover:bg-black/70"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-card/90 hover:bg-accent"
                   >
                     <FaChevronRight />
                   </Button>
                 )}
               </div>
 
-              <div className="border-t border-white/10 px-4 py-4 bg-[#1d1f29]">
+              <div className="border-t border-border px-4 py-4 bg-card min-w-0 max-w-full overflow-auto">
                 <ProfilePhotoStrip
                   photos={photos}
                   activePhotoId={currentPhoto._id}

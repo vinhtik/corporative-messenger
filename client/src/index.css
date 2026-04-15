@@ -227,3 +227,20 @@
   font-weight: 900;
   font-style: italic;
 }
+
+[data-sonner-toast] {
+  position: relative !important;
+}
+
+[data-sonner-toast] [data-close-button] {
+  position: absolute !important;
+  left: -8px !important;
+  top: -8px !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+[data-sonner-toast] [data-content] {
+  margin: 0 !important;
+  padding: 0 !important;
+}

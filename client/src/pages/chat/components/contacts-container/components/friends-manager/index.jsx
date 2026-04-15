@@ -349,7 +349,7 @@ const FriendsManager = () => {
     return (
       <Button
         size="sm"
-        className="w-full sm:w-auto bg-green-700 hover:bg-green-900"
+        className="w-full sm:w-auto bg-primary hover:bg-primary/80"
         disabled={isBusy}
         onClick={() => sendFriendRequest(user._id)}
       >
@@ -364,33 +364,33 @@ const FriendsManager = () => {
         <Tooltip>
           <TooltipTrigger>
             <FaUserPlus
-              className="text-neutral-400 font-light text-opacity-90 text-start hover:text-neutral-100 cursor-pointer transition-all duration-200"
+              className="text-muted-foreground font-light text-opacity-90 text-start hover:text-foreground cursor-pointer transition-all duration-200"
               onClick={() => setOpen(true)}
             />
           </TooltipTrigger>
-          <TooltipContent className="bg-[#1c1b1e] border-none mb-2 p-3 text-white">
+          <TooltipContent className="bg-popover border-border border mb-2 p-3 text-popover-foreground">
             Друзья
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-[#181920] border-none text-white w-[95vw] sm:w-[600px] max-w-[95vw] h-[92vh] sm:h-[650px] flex flex-col">
+        <DialogContent className="bg-card border-border border text-card-foreground w-[95vw] sm:w-[600px] max-w-[95vw] h-[92vh] sm:h-[650px] flex flex-col">
           <DialogHeader>
             <DialogTitle>Друзья</DialogTitle>
-            <DialogDescription className="text-white/50">
+            <DialogDescription className="text-muted-foreground">
               Здесь можно искать пользователей, отправлять заявки и начинать диалоги с друзьями.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex gap-2 bg-[#232531] p-1 rounded-xl">
+          <div className="flex gap-2 bg-muted border border-border p-1 rounded-xl">
             <button
               type="button"
               onClick={() => setActiveTab(TABS.FRIENDS)}
               className={`flex-1 rounded-lg py-2 text-sm transition-all ${
                 activeTab === TABS.FRIENDS
-                  ? "bg-green-700 text-white"
-                  : "text-white/65 hover:bg-white/5"
+                  ? "bg-primary text-card-foreground"
+                  : "text-muted-foreground hover:bg-accent"
               }`}
             >
               Друзья
@@ -401,13 +401,13 @@ const FriendsManager = () => {
               onClick={() => setActiveTab(TABS.REQUESTS)}
               className={`flex-1 rounded-lg py-2 text-sm transition-all ${
                 activeTab === TABS.REQUESTS
-                  ? "bg-green-700 text-white"
-                  : "text-white/65 hover:bg-white/5"
+                  ? "bg-primary text-card-foreground"
+                  : "text-muted-foreground hover:bg-accent"
               }`}
             >
               Заявки
               {!!incomingRequests.length && (
-                <span className="ml-2 text-xs bg-white/15 px-2 py-1 rounded-full">
+                <span className="ml-2 text-xs bg-background/80 text-foreground border border-border px-2 py-1 rounded-full">
                   {incomingRequests.length}
                 </span>
               )}
@@ -418,8 +418,8 @@ const FriendsManager = () => {
               onClick={() => setActiveTab(TABS.SEARCH)}
               className={`flex-1 rounded-lg py-2 text-sm transition-all ${
                 activeTab === TABS.SEARCH
-                  ? "bg-green-700 text-white"
-                  : "text-white/65 hover:bg-white/5"
+                  ? "bg-primary text-card-foreground"
+                  : "text-muted-foreground hover:bg-accent"
               }`}
             >
               Поиск
@@ -427,13 +427,13 @@ const FriendsManager = () => {
           </div>
 
           {activeTab === TABS.FRIENDS && (
-            <div className="flex-1 min-h-0 rounded-xl bg-[#232531] p-4">
-              <div className="text-sm text-white/60 mb-3">Список друзей</div>
+            <div className="flex-1 min-h-0 rounded-xl bg-muted border border-border p-4">
+              <div className="text-sm text-muted-foreground mb-3">Список друзей</div>
 
               <ScrollArea className="h-[470px] pr-3">
                 <div className="flex flex-col gap-3">
                   {!isLoadingFriends && friends.length === 0 && (
-                    <div className="text-white/50 text-sm text-center py-10">
+                    <div className="text-muted-foreground text-sm text-center py-10">
                       Пока нет друзей
                     </div>
                   )}
@@ -444,7 +444,7 @@ const FriendsManager = () => {
                     return (
                       <div
                         key={friend._id}
-                        className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                        className="bg-card border border-border rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                       >
                         <button
                           type="button"
@@ -462,7 +462,7 @@ const FriendsManager = () => {
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                           <Button
                             size="sm"
-                            className="w-full sm:w-auto bg-green-700 hover:bg-green-900"
+                            className="w-full sm:w-auto bg-primary hover:bg-primary/80"
                             onClick={() => openChatWithUser(friend)}
                           >
                             Написать
@@ -487,15 +487,15 @@ const FriendsManager = () => {
           )}
 
           {activeTab === TABS.REQUESTS && (
-            <div className="flex-1 min-h-0 rounded-xl bg-[#232531] p-4">
-              <div className="flex gap-2 bg-[#1b1c24] p-1 rounded-xl mb-4">
+            <div className="flex-1 min-h-0 rounded-xl bg-muted border border-border p-4">
+              <div className="flex gap-2 bg-background border border-border p-1 rounded-xl mb-4">
                 <button
                   type="button"
                   onClick={() => setActiveRequestsTab(REQUEST_TABS.INCOMING)}
                   className={`flex-1 rounded-lg py-2 text-sm transition-all ${
                     activeRequestsTab === REQUEST_TABS.INCOMING
-                      ? "bg-green-700 text-white"
-                      : "text-white/65 hover:bg-white/5"
+                      ? "bg-primary text-card-foreground"
+                      : "text-muted-foreground hover:bg-accent"
                   }`}
                 >
                   Входящие
@@ -511,8 +511,8 @@ const FriendsManager = () => {
                   onClick={() => setActiveRequestsTab(REQUEST_TABS.OUTGOING)}
                   className={`flex-1 rounded-lg py-2 text-sm transition-all ${
                     activeRequestsTab === REQUEST_TABS.OUTGOING
-                      ? "bg-green-700 text-white"
-                      : "text-white/65 hover:bg-white/5"
+                      ? "bg-primary text-card-foreground"
+                      : "text-muted-foreground hover:bg-accent"
                   }`}
                 >
                   Исходящие
@@ -528,7 +528,7 @@ const FriendsManager = () => {
                 <ScrollArea className="h-[440px] pr-3">
                   <div className="flex flex-col gap-3">
                     {!isLoadingRequests && incomingRequests.length === 0 && (
-                      <div className="text-white/50 text-sm text-center py-10">
+                      <div className="text-muted-foreground text-sm text-center py-10">
                         Входящих заявок нет
                       </div>
                     )}
@@ -540,7 +540,7 @@ const FriendsManager = () => {
                       return (
                         <div
                           key={item._id}
-                          className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                          className="bg-card border border-border rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                         >
                           <button
                             type="button"
@@ -598,7 +598,7 @@ const FriendsManager = () => {
                       return (
                         <div
                           key={item._id}
-                          className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                          className="bg-card rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                         >
                           <button
                             type="button"
@@ -638,11 +638,11 @@ const FriendsManager = () => {
           )}
 
           {activeTab === TABS.SEARCH && (
-            <div className="flex-1 min-h-0 rounded-xl bg-[#232531] p-4">
+            <div className="flex-1 min-h-0 rounded-xl bg-muted p-4">
               <div className="mb-3">
                 <Input
                   placeholder="Найти пользователя"
-                  className="rounded-lg p-6 bg-[#1b1c24] border-none"
+                  className="rounded-lg p-6 bg-background border-none"
                   value={searchTerm}
                   onChange={(e) => searchUsers(e.target.value)}
                 />
@@ -651,7 +651,7 @@ const FriendsManager = () => {
               <ScrollArea className="h-[460px] pr-3">
                 <div className="flex flex-col gap-3">
                   {!searchTerm.trim() && (
-                    <div className="text-white/50 text-sm text-center py-10">
+                    <div className="text-muted-foreground text-sm text-center py-10">
                       Введите имя или фамилию
                     </div>
                   )}
@@ -659,7 +659,7 @@ const FriendsManager = () => {
                   {searchTerm.trim() &&
                     !isSearchingUsers &&
                     searchedUsers.length === 0 && (
-                      <div className="text-white/50 text-sm text-center py-10">
+                      <div className="text-muted-foreground text-sm text-center py-10">
                         Ничего не найдено
                       </div>
                     )}
@@ -667,7 +667,7 @@ const FriendsManager = () => {
                   {searchedUsers.map((user) => (
                     <div
                       key={user._id}
-                      className="bg-[#1b1c24] rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      className="bg-card border border-border rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                     >
                       <button
                         type="button"

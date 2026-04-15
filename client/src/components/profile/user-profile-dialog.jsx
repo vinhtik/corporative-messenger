@@ -102,7 +102,7 @@ const UserProfileDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="bg-[#181920] border-none text-white w-[95vw] max-w-[520px] p-0 overflow-hidden">
+        <DialogContent className="bg-card border border-border text-card-foreground w-[95vw] max-w-[520px] p-0 overflow-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>
               {fullName ? `Профиль пользователя ${fullName}` : "Профиль пользователя"}
@@ -160,9 +160,9 @@ const UserProfileDialog = ({
                 <Button
                   type="button"
                   onClick={handleMessageClick}
-                  className="relative overflow-hidden bg-green-700 hover:bg-green-900 transition-all duration-200 rounded-full px-5 py-5 min-h-[48px]"
+                  className="relative overflow-hidden bg-primary hover:bg-primary/80 transition-all duration-200 rounded-full px-5 py-5 min-h-[48px]"
                 >
-                  <span className="absolute inset-0 rounded-full animate-ping bg-green-400/20" />
+                  <span className="absolute inset-0 rounded-full animate-ping bg-primary/20" />
                   <span className="relative flex items-center gap-2">
                     <MessageCircle className="h-5 w-5" />
                     Написать сообщение
@@ -172,7 +172,7 @@ const UserProfileDialog = ({
             </div>
 
             <div className="px-6 py-5 flex flex-col gap-3">
-              <div className="text-sm text-white/60">Фотографии профиля</div>
+              <div className="text-sm text-muted-foreground">Фотографии профиля</div>
 
               <ProfilePhotoStrip
                 photos={photos}

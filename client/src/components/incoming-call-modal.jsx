@@ -102,8 +102,8 @@ const IncomingCallModal = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-md flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-3xl border border-[#2f303b] bg-[#181920] p-8 text-white shadow-2xl">
+    <div className="fixed inset-0 z-[200] bg-background/70 backdrop-blur-md flex items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 text-card-foreground shadow-2xl">
         <div className="flex flex-col items-center text-center">
           <div className="mb-5">
             <Avatar className="h-24 w-24 rounded-full overflow-hidden">
@@ -125,21 +125,21 @@ const IncomingCallModal = () => {
             </Avatar>
           </div>
 
-          <p className="text-sm uppercase tracking-[0.25em] text-neutral-400 mb-2">
+          <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground mb-2">
             Входящий звонок
           </p>
 
           <h2 className="text-2xl font-semibold mb-2">{callerName}</h2>
 
           {isChannelCall && incomingCall.channel?.name ? (
-            <p className="text-neutral-400 mb-3">
-              приглашает в группу <span className="text-white">{incomingCall.channel.name}</span>
+            <p className="text-muted-foreground mb-3">
+              приглашает в группу <span className="text-foreground">{incomingCall.channel.name}</span>
             </p>
           ) : (
-            <p className="text-neutral-400 mb-3">хочет начать разговор</p>
+            <p className="text-muted-foreground mb-3">хочет начать разговор</p>
           )}
 
-          <div className="flex items-center gap-2 rounded-full bg-[#232531] px-4 py-2 text-sm text-neutral-300">
+          <div className="flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm text-secondary-foreground border border-border">
             {isChannelCall ? <UserPlus className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
             {isChannelCall ? "Присоединиться к звонку" : "Звонок"}
           </div>

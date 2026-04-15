@@ -139,6 +139,8 @@ const MessageBar = () => {
   const activePointerIdRef = useRef(null);
   const pointerStartYRef = useRef(0);
   const isLockedRecordingRef = useRef(false);
+  const sourceMediaStreamRef = useRef(null);
+  const processedVideoCleanupRef = useRef(null)
 
   const socket = useSocket();
 
@@ -217,6 +219,10 @@ const MessageBar = () => {
 
       mediaStreamRef.current = null;
       revokeRecordedPreviewUrl();
+      if (processedVideoCleanupRef.current) {
+          processedVideoCleanupRef.current()
+          processedVideoCleanupRef.current = null
+      }
       releaseManagedOwner(RECORDER_MEDIA_OWNER);
     };
   }, []);
@@ -310,6 +316,111 @@ const MessageBar = () => {
   const handleAddEmoji = (emoji) => {
     setMessage((prev) => prev + emoji.emoji);
   };
+
+  const stopStreamSafely = (stream) => {
+  if (!stream) return;
+
+  stream.getTracks().forEach((track) => {
+    try {
+      track.stop();
+    } catch (error) {
+      console.log("track.stop error", error);
+    }
+  });
+};
+
+const createCanvasProcessedVideoStream = async ({
+  sourceStream,
+  shouldMirror,
+  fps = 30,
+}) => {
+  const sourceVideo = document.createElement("video");
+  sourceVideo.autoplay = true;
+  sourceVideo.muted = true;
+  sourceVideo.playsInline = true;
+  sourceVideo.srcObject = sourceStream;
+
+  await sourceVideo.play();
+
+  const sourceTrack = sourceStream.getVideoTracks()[0];
+  const settings = sourceTrack?.getSettings?.() || {};
+
+  const width = settings.width || 720;
+  const height = settings.height || 720;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d", { alpha: false });
+
+  let rafId = 0;
+  let stopped = false;
+
+  const drawFrame = () => {
+    if (stopped || !ctx) return;
+
+    if (sourceVideo.readyState >= 2) {
+      ctx.clearRect(0, 0, width, height);
+
+      if (shouldMirror) {
+        ctx.save();
+        ctx.translate(width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(sourceVideo, 0, 0, width, height);
+        ctx.restore();
+      } else {
+        ctx.drawImage(sourceVideo, 0, 0, width, height);
+      }
+    }
+
+    rafId = requestAnimationFrame(drawFrame);
+  };
+
+  drawFrame();
+
+  const canvasStream = canvas.captureStream(fps);
+  const processedStream = new MediaStream();
+
+  const canvasVideoTrack = canvasStream.getVideoTracks()[0];
+  if (canvasVideoTrack) {
+    processedStream.addTrack(canvasVideoTrack);
+  }
+
+  sourceStream.getAudioTracks().forEach((track) => {
+    processedStream.addTrack(track);
+  });
+
+  const cleanup = () => {
+    stopped = true;
+
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+
+    try {
+      sourceVideo.pause();
+    } catch (error) {
+      console.log("sourceVideo.pause error", error);
+    }
+
+    sourceVideo.srcObject = null;
+
+    canvasStream.getVideoTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch (error) {
+        console.log("canvas video track.stop error", error);
+      }
+    });
+  };
+
+  return {
+    stream: processedStream,
+    cleanup,
+  };
+};
+  
 
   const togglePreferredRecordingMode = async () => {
     if (isMediaDraftActive || isSendingRecordedMedia) return;
@@ -623,25 +734,38 @@ const MessageBar = () => {
       resetRecordingClock();
       setLockGuideProgress(0);
 
-      const stream = await requestManagedUserMedia({
+      const sourceStream = await requestManagedUserMedia({
         owner: RECORDER_MEDIA_OWNER,
         constraints,
         releaseDelayMs: 600,
       });
 
-      mediaStreamRef.current = stream;
-      rememberCameraFromStream(stream);
+      sourceMediaStreamRef.current = sourceStream;
+      rememberCameraFromStream(sourceStream);
+
+      let recordingStream = sourceStream;
 
       if (mode === "video-note") {
-        await attachPreviewStream(stream);
+        const processed = await createCanvasProcessedVideoStream({
+          sourceStream,
+          shouldMirror: videoFacingMode === "user",
+        });
+
+        processedVideoCleanupRef.current = processed.cleanup;
+        recordingStream = processed.stream;
+
+        await attachPreviewStream(sourceStream);
       }
+
+      mediaStreamRef.current = recordingStream;
+
 
       const recorderOptions = buildRecorderOptions({
         mimeType: selectedMimeType,
         isVideoMode,
       });
 
-      const recorder = new MediaRecorder(stream, recorderOptions);
+      const recorder = new MediaRecorder(recordingStream, recorderOptions);
 
       mediaRecorderRef.current = recorder;
 
@@ -652,6 +776,10 @@ const MessageBar = () => {
       };
 
       recorder.onstop = () => {
+        if (processedVideoCleanupRef.current) {
+          processedVideoCleanupRef.current();
+          processedVideoCleanupRef.current = null;
+        }
         const duration = recordingSecondsRef.current;
         const finalMimeType =
           recorder.mimeType || selectedMimeType || fallbackMimeType;
@@ -664,7 +792,13 @@ const MessageBar = () => {
           videoPreviewRef.current.srcObject = null;
         }
 
+        if (processedVideoCleanupRef.current) {
+          processedVideoCleanupRef.current()
+          processedVideoCleanupRef.current = null
+        }
+
         mediaStreamRef.current = null;
+        sourceMediaStreamRef.current = null
         mediaRecorderRef.current = null;
         discardOnStopRef.current = false;
         autoSendOnStopRef.current = false;
@@ -759,7 +893,13 @@ const MessageBar = () => {
         videoPreviewRef.current.srcObject = null;
       }
 
+      if (processedVideoCleanupRef.current) {
+          processedVideoCleanupRef.current()
+          processedVideoCleanupRef.current = null
+      }
+
       mediaStreamRef.current = null;
+      sourceMediaStreamRef.current = null
       mediaRecorderRef.current = null;
       setIsRecording(false);
       setRecordingMode(null);
@@ -948,16 +1088,17 @@ const MessageBar = () => {
             muted
             playsInline
             className="h-full w-full object-cover"
+            style={{transform: videoFacingMode === "user" ? "scaleX(-1)" : "none"}}
           />
         </div>
 
         <div className="text-center">
-          <div className="text-sm font-medium text-white">
+          <div className="text-sm font-medium text-foreground">
             {renderRecordingHeader()}
           </div>
 
           {!isLockedRecording ? (
-            <div className="mt-1 flex items-center justify-center gap-2 text-xs text-white/60">
+            <div className="mt-1 flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <IoLockClosed className="text-sm" />
               <span>Потяни вверх до замка · {formatDuration(recordingSeconds)}</span>
             </div>
@@ -968,7 +1109,7 @@ const MessageBar = () => {
             </div>
           )}
 
-          <div className="mt-2 text-[11px] text-white/45">
+          <div className="mt-2 text-[11px] text-muted-foreground">
             Камера: {videoFacingMode === "user" ? "фронтальная" : "задняя"}
           </div>
         </div>
@@ -1007,7 +1148,7 @@ const MessageBar = () => {
           {isLockedRecording && (
             <button
               type="button"
-              className="rounded-xl bg-[#1fce4a] p-3 text-white transition-all hover:bg-[#1bda54ac] disabled:opacity-50"
+              className="rounded-xl bg-primary p-3 text-foreground transition-all hover:bg-primary/80 disabled:opacity-50"
               onClick={sendLockedRecording}
               disabled={isSendingRecordedMedia}
               title="Остановить и отправить"
@@ -1029,12 +1170,12 @@ const MessageBar = () => {
           </div>
 
           <div className="min-w-0">
-            <div className="text-sm font-medium text-white">
+            <div className="text-sm font-medium text-foreground">
               {renderRecordingHeader()}
             </div>
 
             {!isLockedRecording ? (
-              <div className="flex items-center gap-2 text-xs text-white/60">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <IoLockClosed className="text-sm" />
                 <span>
                   Потяни вверх до замка · {formatDuration(recordingSeconds)}
@@ -1073,7 +1214,7 @@ const MessageBar = () => {
           {isLockedRecording && (
             <button
               type="button"
-              className="rounded-xl bg-[#1fce4a] p-3 text-white transition-all hover:bg-[#1bda54ac] disabled:opacity-50"
+              className="rounded-xl bg-primary p-3 text-foreground transition-all hover:bg-primary/80 disabled:opacity-50"
               onClick={sendLockedRecording}
               disabled={isSendingRecordedMedia}
               title="Остановить и отправить"
@@ -1087,9 +1228,9 @@ const MessageBar = () => {
   };
 
   return (
-    <div className="shrink-0 min-h-16 md:min-h-20 bg-[#1c1d25] pb-[env(safe-area-inset-bottom)] px-2 md:px-8 md:mb-6">
+    <div className="shrink-0 min-h-16 md:min-h-20 bg-none pb-[env(safe-area-inset-bottom)] px-2 md:px-8 md:mb-6">
       {(isRecording || recordedBlob) && (
-        <div className="mb-3 rounded-2xl border border-white/10 bg-[#2a2b33] p-3 md:p-4">
+        <div className="mb-3 rounded-2xl border border-border bg-card text-card-foreground p-3 md:p-4">
           {isRecording ? (
             recordingMode === "video-note" ? (
               renderVideoRecordingPanel()
@@ -1119,12 +1260,12 @@ const MessageBar = () => {
                 )}
 
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-white">
+                  <div className="text-sm font-medium text-foreground">
                     {recordingMode === "audio"
                       ? "Голосовое сообщение"
                       : "Видеосообщение"}
                   </div>
-                  <div className="text-xs text-white/60">
+                  <div className="text-xs text-muted-foregound">
                     {formatDuration(recordedDuration)}
                   </div>
                 </div>
@@ -1143,7 +1284,7 @@ const MessageBar = () => {
 
                 <button
                   type="button"
-                  className="rounded-xl bg-[#1fce4a] p-3 text-white transition-all hover:bg-[#1bda54ac] disabled:opacity-50"
+                  className="rounded-xl bg-primary p-3 text-foreground transition-all hover:bg-primary/80 disabled:opacity-50"
                   onClick={sendRecordedMedia}
                   disabled={isSendingRecordedMedia}
                   title="Отправить запись"
@@ -1157,7 +1298,7 @@ const MessageBar = () => {
       )}
 
       <div className="flex items-center justify-center gap-2 md:gap-4">
-        <div className="flex-1 flex bg-[#2a2b33] px-2 rounded-xl items-center pr-3 md:pr-5">
+        <div className="flex-1 flex bg-card border border-border px-2 rounded-xl items-center pr-3 md:pr-5">
           <textarea
             className="flex-1 md:p-5 p-2 bg-transparent rounded-xl focus:border-none focus:outline-none resize-none overflow-hidden disabled:opacity-60"
             placeholder={
@@ -1173,7 +1314,7 @@ const MessageBar = () => {
           />
 
           <button
-            className="text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-200 transition-all disabled:opacity-50"
+            className="text-muted-foreground focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all disabled:opacity-50"
             onClick={handleAttachmentClick}
             type="button"
             disabled={isMediaDraftActive || isSendingRecordedMedia}
@@ -1190,7 +1331,7 @@ const MessageBar = () => {
           />
 
           <button
-            className="text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-200 transition-all ml-2 disabled:opacity-50"
+            className="text-muted-foreground focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all ml-2 disabled:opacity-50"
             onClick={togglePreferredRecordingMode}
             type="button"
             disabled={isMediaDraftActive || isSendingRecordedMedia}
@@ -1205,7 +1346,7 @@ const MessageBar = () => {
 
           <div className="relative flex">
             <button
-              className="text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-200 transition-all ml-2 disabled:opacity-50"
+              className="text-muted-foreground focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all ml-2 disabled:opacity-50"
               onClick={() => setEmojiPickerOpen((prev) => !prev)}
               type="button"
               disabled={isMediaDraftActive}
@@ -1230,7 +1371,7 @@ const MessageBar = () => {
 
         {hasTypedMessage ? (
           <button
-            className="bg-[#1fce4a] rounded-xl flex items-center justify-center md:p-5 p-3 focus:border-none hover:bg-[#1bda54ac] focus:bg-[#1bda54ac] focus:outline-none focus:text-white duration-200 transition-all disabled:opacity-50"
+            className="bg-primary text-primary-foreground rounded-xl flex items-center justify-center md:p-5 p-3 focus:border-none hover:bg-primary/90 focus:bg-primary/80 focus:outline-none focus:text-foreground duration-200 transition-all disabled:opacity-50"
             onClick={handleSendMessage}
             type="button"
             disabled={!message.trim() || isMediaDraftActive}
@@ -1254,8 +1395,8 @@ const MessageBar = () => {
                     isLockedRecording
                       ? "border-green-400 bg-green-500/20 text-green-400"
                       : lockGuideProgress > 0.15
-                      ? "border-white/50 bg-white/10 text-white"
-                      : "border-white/20 bg-[#2a2b33]/90 text-white/60"
+                      ? "border-border bg-accent text-accent-foreground"
+                      : "border-border bg-card/90 text-muted-foreground"
                   }`}
                 >
                   <IoLockClosed className="text-xl" />
@@ -1264,8 +1405,8 @@ const MessageBar = () => {
             )}
 
             <button
-              className={`bg-[#1fce4a] rounded-xl flex items-center justify-center md:p-5 p-3 focus:border-none hover:bg-[#1bda54ac] focus:bg-[#1bda54ac] focus:outline-none focus:text-white duration-200 transition-all disabled:opacity-50 active:scale-95 touch-none ${
-                isLockedRecording ? "ring-2 ring-green-400/60" : ""
+              className={`bg-primary rounded-xl flex items-center justify-center md:p-5 p-3 focus:border-none hover:bg-primary/80 focus:bg-primary/70 focus:outline-none focus:text-foreground duration-200 transition-all disabled:opacity-50 active:scale-95 touch-none ${
+                isLockedRecording ? "ring-2 ring-primary/60" : ""
               }`}
               type="button"
               onPointerDown={handleRecordPointerDown}

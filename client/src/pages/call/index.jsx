@@ -34,8 +34,8 @@ import { toast } from "sonner";
 
 const baseButtonClass =
   "h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200";
-const neutralButtonClass = `${baseButtonClass} bg-[#232531] text-white hover:bg-[#2d3040]`;
-const activeButtonClass = `${baseButtonClass} bg-green-600 text-white hover:bg-green-700`;
+const neutralButtonClass = `${baseButtonClass} bg-card border border-border text-card-foreground hover:bg-accent`;
+const activeButtonClass = `${baseButtonClass} bg-primary text-primary-foreground hover:bg-primary/90`;
 const dangerButtonClass = `${baseButtonClass} bg-red-600 text-white hover:bg-red-700`;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -350,7 +350,7 @@ const CallStage = ({ focusedTrackKey, onFocusChange }) => {
 
   if (!tracks.length) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-neutral-400">
+      <div className="h-full w-full bg-background flex items-center justify-center text-foreground">
         Ожидание участников...
       </div>
     );
@@ -874,10 +874,10 @@ const CallPage = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full bg-[#1c1d25] text-white flex items-center justify-center">
+      <div className="h-screen w-full bg-background text-foreground flex items-center justify-center">
         <div className="text-center">
           <p className="text-2xl font-semibold mb-3">Подключение к звонку...</p>
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-muted-foreground">
             Поднимается комната и публикуются медиа-треки.
           </p>
         </div>
@@ -887,10 +887,10 @@ const CallPage = () => {
 
   if (errorText) {
     return (
-      <div className="h-screen w-full bg-[#1c1d25] text-white flex items-center justify-center px-6">
-        <div className="w-full max-w-xl rounded-2xl border border-[#2f303b] bg-[#181920] p-8 text-center">
+      <div className="h-screen w-full bg-background text-foreground flex items-center justify-center px-6">
+        <div className="w-full max-w-xl rounded-2xl border border-border bg-background p-8 text-center">
           <p className="text-2xl font-semibold mb-3">Не удалось открыть звонок</p>
-          <p className="text-neutral-400 mb-6">{errorText}</p>
+          <p className="text-muted-foreground mb-6">{errorText}</p>
 
           <button
             type="button"
@@ -907,16 +907,16 @@ const CallPage = () => {
 
   return (
     <RoomContext.Provider value={room}>
-      <div className="h-screen w-full flex flex-col bg-[#1c1d25] text-white">
-        <div className="h-[72px] shrink-0 border-b border-[#2f303b] px-6 flex items-center justify-between gap-4">
+      <div className="h-screen w-full flex flex-col bg-background text-foreground">
+        <div className="h-[72px] shrink-0 border-b border-border bg-background px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-11 w-11 rounded-full bg-[#ffffff18] flex items-center justify-center shrink-0">
+            <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center shrink-0 text-muted-foreground">
               <Phone className="h-5 w-5" />
             </div>
 
             <div className="min-w-0">
               <p className="text-lg font-semibold truncate">{title}</p>
-              <p className="text-sm text-neutral-400 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 участников: {participantsCount} · {isConnected ? "connected" : "connecting"}
               </p>
             </div>
@@ -927,7 +927,7 @@ const CallPage = () => {
               <button
                 type="button"
                 onClick={reinviteParticipants}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#2f303b] px-4 py-2 text-sm text-neutral-300 hover:bg-[#2a2c37] transition-all duration-200"
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card text-card-foreground hover:bg-accent px-4 py-2 text-sm transition-all duration-200"
                 title="Позвать тех, кто ещё не в звонке"
               >
                 <UserPlus className="h-4 w-4" />
@@ -938,7 +938,7 @@ const CallPage = () => {
             <button
               type="button"
               onClick={() => performLeave(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-[#2f303b] px-4 py-2 text-sm text-neutral-300 hover:bg-[#2a2c37] transition-all duration-200"
+              className="inline-flex items-center gap-2 rounded-xl border-t border-border bg-card px-4 py-2 text-sm text-neutral-300 hover:bg-[#2a2c37] transition-all duration-200"
             >
               <ArrowLeft className="h-4 w-4" />
               Назад
@@ -954,7 +954,7 @@ const CallPage = () => {
           />
         </div>
 
-        <div className="shrink-0 border-t border-[#2f303b] bg-[#181920] px-6 py-5 flex items-center justify-center gap-4">
+        <div className="shrink-0 border-t border-border bg-background px-6 py-5 flex items-center justify-center gap-4">
           <button
             type="button"
             onClick={toggleMicrophone}

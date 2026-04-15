@@ -40,7 +40,7 @@ const ProfileInfo = () => {
 
   return (
     <>
-      <div className="absolute bottom-0 h-16 flex items-center justify-between px-10 w-full bg-[#2a2b33]">
+      <div className="absolute bottom-0 h-16 flex items-center justify-between px-10 w-full bg-sidebar text-sidebar-foreground">
         <div className="flex gap-3 items-center justify-center min-w-0">
           <button
             type="button"
@@ -84,10 +84,10 @@ const ProfileInfo = () => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button type="button" onClick={() => navigate("/profile")}>
-                  <FiEdit2 className="text-green-700 text-xl font-medium" />
+                  <FiEdit2 className="text-primary text-xl font-medium" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="bg-[#1c1b1e] border-none text-white">
+              <TooltipContent className="bg-popover border-none text-popover-foreground">
                 Изменить данные
               </TooltipContent>
             </Tooltip>

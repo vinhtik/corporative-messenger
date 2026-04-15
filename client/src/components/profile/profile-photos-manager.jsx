@@ -169,11 +169,11 @@ const ProfilePhotosManager = () => {
 
   return (
     <>
-      <div className="w-full rounded-2xl bg-[#2c2e3b] p-5 flex flex-col gap-5">
+      <div className="w-full rounded-2xl bg-card border border-border text-card-foreground p-5 flex flex-col gap-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h3 className="text-white text-lg font-medium">Фотографии профиля</h3>
-            <p className="text-white/50 text-sm">
+            <h3 className="text-card-foreground text-lg font-medium">Фотографии профиля</h3>
+            <p className="text-muted-foreground text-sm">
               Нажми на фото, чтобы открыть просмотр и выбрать аватар.
             </p>
           </div>
@@ -182,7 +182,7 @@ const ProfilePhotosManager = () => {
             type="button"
             onClick={openFilePicker}
             disabled={loading}
-            className="bg-green-700 hover:bg-green-900 transition-all duration-200"
+            className="bg-primary hover:bg-primary/70 transition-all duration-200"
           >
             <FaPlus className="mr-2" />
             Добавить фото
@@ -233,12 +233,12 @@ const ProfilePhotosManager = () => {
           </div>
 
           <div className="flex-1 flex flex-col gap-4 min-w-0">
-            <div className="text-white/70 text-sm">
+            <div className="text-muted-foreground text-sm">
               Основная фотография используется как аватар в чатах и профиле.
             </div>
 
             {photos.length === 0 ? (
-              <div className="h-28 rounded-xl border border-dashed border-white/15 flex items-center justify-center text-white/40 text-sm">
+              <div className="h-28 rounded-xl border border-dashed border-border flex items-center justify-center text-muted-foreground text-sm">
                 Пока что фотографий нет
               </div>
             ) : (
