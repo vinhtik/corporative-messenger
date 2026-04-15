@@ -70,7 +70,7 @@ const ProfilePhotosViewer = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-card border border-border text-card-foreground w-[95vw] max-w-5xl p-0 overflow-hidden">
-        <div className="relative min-h-[70vh] flex flex-col">
+        <div className="relative min-h-[70vh] min-w-0 flex flex-col">
 
           {!currentPhoto ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -152,12 +152,15 @@ const ProfilePhotosViewer = ({
                 )}
               </div>
 
-              <div className="border-t border-border px-4 py-4 bg-card min-w-0 max-w-full overflow-auto">
-                <ProfilePhotoStrip
+              <div className="border-t border-border px-4 py-4 bg-card min-w-0 max-w-full">
+                <div className="flex flex-col gap-4 min-w-0 w-full">
+                  <ProfilePhotoStrip
                   photos={photos}
                   activePhotoId={currentPhoto._id}
                   onPhotoClick={handleThumbnailClick}
+                    className="w-full min-w-0"
                 />
+                </div>
               </div>
             </>
           )}

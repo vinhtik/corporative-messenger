@@ -15,6 +15,7 @@ import { useAppStore } from "@/store";
 import ProfilePhotoStrip from "./profile-photo-strip";
 import ProfilePhotosViewer from "./profile-photos-viewer";
 
+
 const UserProfileDialog = ({
   open,
   onOpenChange,
@@ -30,9 +31,11 @@ const UserProfileDialog = ({
     setSelectedChatMessages,
   } = useAppStore();
 
+
   const photos = user?.profilePhotos || [];
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+
 
   useEffect(() => {
     if (!open) {
@@ -40,6 +43,7 @@ const UserProfileDialog = ({
       setViewerIndex(0);
     }
   }, [open]);
+
 
   const fullName = useMemo(() => {
     if (!user) return "";
@@ -49,18 +53,22 @@ const UserProfileDialog = ({
     return user.email || "";
   }, [user]);
 
+
   const avatarPhoto = useMemo(() => {
     return photos.find((photo) => photo.isAvatar) || null;
   }, [photos]);
 
-  const isOwnProfile = 
-  String(user?._id || "") === String(userInfo?.id || "") ||
-  String(user?._id || "") === String(userInfo?._id || "");
+
+  const isOwnProfile =
+    String(user?._id || "") === String(userInfo?.id || "") ||
+    String(user?._id || "") === String(userInfo?._id || "");
+
 
   const handlePhotoClick = (_, index) => {
     setViewerIndex(index);
     setViewerOpen(true);
   };
+
 
   const handleOpenChange = (nextOpen) => {
     onOpenChange(nextOpen);
@@ -70,25 +78,32 @@ const UserProfileDialog = ({
     }
   };
 
+
   const openChatDirectly = (targetUser) => {
     if (!targetUser?._id) return;
+
 
     const sameChat =
       selectedChatType === "contact" &&
       String(selectedChatData?._id || "") === String(targetUser._id);
 
+
     setSelectedChatType("contact");
     setSelectedChatData(targetUser);
+
 
     if (!sameChat) {
       setSelectedChatMessages([]);
     }
 
+
     onOpenChange(false);
   };
 
+
   const handleMessageClick = () => {
     if (!user || isOwnProfile) return;
+
 
     if (onMessage) {
       onMessage(user);
@@ -96,13 +111,15 @@ const UserProfileDialog = ({
       return;
     }
 
+
     openChatDirectly(user);
   };
+
 
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="bg-card border border-border text-card-foreground w-[95vw] max-w-[520px] p-0 overflow-hidden">
+        <DialogContent className="bg-card border border-border text-card-foreground w-[95vw] max-w-[520px] max-h-[90vh] p-0 overflow-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>
               {fullName ? `Профиль пользователя ${fullName}` : "Профиль пользователя"}
@@ -112,8 +129,9 @@ const UserProfileDialog = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col">
-            <div className="px-6 pt-8 pb-6 flex flex-col items-center gap-4 border-b border-white/10">
+
+          <div className="flex max-h-[90vh] flex-col overflow-hidden">
+            <div className="px-6 pt-8 pb-6 flex flex-col items-center gap-4 border-b border-white/10 shrink-0">
               <button
                 type="button"
                 className="cursor-default"
@@ -152,9 +170,11 @@ const UserProfileDialog = ({
                 </Avatar>
               </button>
 
+
               <div className="flex flex-col items-center gap-1 text-center">
                 <div className="text-2xl font-semibold break-words">{fullName}</div>
               </div>
+
 
               {!isOwnProfile && (
                 <Button
@@ -171,18 +191,24 @@ const UserProfileDialog = ({
               )}
             </div>
 
-            <div className="px-6 py-5 flex flex-col gap-3">
+
+            <div className="px-6 py-5 flex flex-col gap-3 min-w-0 overflow-y-auto">
               <div className="text-sm text-muted-foreground">Фотографии профиля</div>
 
-              <ProfilePhotoStrip
-                photos={photos}
-                activePhotoId={photos[viewerIndex]?._id || null}
-                onPhotoClick={handlePhotoClick}
-              />
+
+              <div className="w-full min-w-0 overflow-x-auto">
+                <ProfilePhotoStrip
+                  photos={photos}
+                  activePhotoId={photos[viewerIndex]?._id || null}
+                  onPhotoClick={handlePhotoClick}
+                  className="min-w-max"
+                />
+              </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
 
       <ProfilePhotosViewer
         open={viewerOpen}
@@ -193,6 +219,7 @@ const UserProfileDialog = ({
     </>
   );
 };
+
 
 export default UserProfileDialog;
 

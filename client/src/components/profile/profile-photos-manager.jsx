@@ -169,7 +169,7 @@ const ProfilePhotosManager = () => {
 
   return (
     <>
-      <div className="w-full rounded-2xl bg-card border border-border text-card-foreground p-5 flex flex-col gap-5">
+      <div className="w-full min-w-0 rounded-2xl bg-card border border-border text-card-foreground p-5 flex flex-col gap-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h3 className="text-card-foreground text-lg font-medium">Фотографии профиля</h3>

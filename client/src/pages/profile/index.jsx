@@ -128,7 +128,6 @@ const Profile = () => {
                 ))}
               </div>
             </div>
-
             <ProfilePhotosManager />
           </div>
         </div>
