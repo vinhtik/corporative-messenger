@@ -33,7 +33,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 const baseButtonClass =
-  "h-14 w-14 rounded-full flex items-center justify-center transition-all duration-200";
+  "h-12 w-12 md:h-14 md:sw-14 rounded-full flex items-center justify-center transition-all duration-200";
 const neutralButtonClass = `${baseButtonClass} bg-card border border-border text-card-foreground hover:bg-accent`;
 const activeButtonClass = `${baseButtonClass} bg-primary text-primary-foreground hover:bg-primary/90`;
 const dangerButtonClass = `${baseButtonClass} bg-red-600 text-white hover:bg-red-700`;
@@ -358,7 +358,7 @@ const CallStage = ({ focusedTrackKey, onFocusChange }) => {
 
   if (focusedTrack) {
     return (
-      <div className="h-full w-full p-4 flex gap-4 overflow-hidden">
+      <div className="h-full w-full p-4 flex gap-4 flex-col md:flex-row overflow-hidden">
         <div className="min-w-0 flex-1">
           <CallTile
             trackRef={focusedTrack}
@@ -874,7 +874,7 @@ const CallPage = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full bg-background text-foreground flex items-center justify-center">
+      <div className="h-dvh w-full bg-background text-foreground flex items-center justify-center">
         <div className="text-center">
           <p className="text-2xl font-semibold mb-3">Подключение к звонку...</p>
           <p className="text-sm text-muted-foreground">
@@ -887,7 +887,7 @@ const CallPage = () => {
 
   if (errorText) {
     return (
-      <div className="h-screen w-full bg-background text-foreground flex items-center justify-center px-6">
+      <div className="h-dvh w-full bg-background text-foreground flex items-center justify-center px-6">
         <div className="w-full max-w-xl rounded-2xl border border-border bg-background p-8 text-center">
           <p className="text-2xl font-semibold mb-3">Не удалось открыть звонок</p>
           <p className="text-muted-foreground mb-6">{errorText}</p>
@@ -907,7 +907,7 @@ const CallPage = () => {
 
   return (
     <RoomContext.Provider value={room}>
-      <div className="h-screen w-full flex flex-col bg-background text-foreground">
+      <div className="h-dvh w-full flex flex-col bg-background text-foreground">
         <div className="h-[72px] shrink-0 border-b border-border bg-background px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center shrink-0 text-muted-foreground">
