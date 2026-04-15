@@ -24,7 +24,9 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   "http://localhost:4173",
   "http://127.0.0.1:4173",
-  "https://corp-messenger.ddns.net"
+  "https://corp-messenger.ddns.net",
+  "http://178.205.150.242",
+  "https://178.205.150.242"
 ].filter(Boolean);
 
 app.use(

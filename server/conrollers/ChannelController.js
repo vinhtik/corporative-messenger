@@ -15,6 +15,7 @@ import {
   uniqueIds,
 } from "../utils/channelPermissions.js";
 import { emitToManyUsers, emitToUser } from "../socket.js";
+import { areAllUsersFriendsWithUser } from "../utils/friendship.js"
 
 const channelMemberPopulation = [
   {
