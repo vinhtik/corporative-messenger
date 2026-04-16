@@ -27,7 +27,7 @@ import { RiEmojiStickerLine } from "react-icons/ri";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-const MAX_VIDEO_NOTE_SECONDS = 60;
+const MAX_TEXTAREA_HEIGHT = 180;
 const RECORDER_MEDIA_OWNER = "message-recorder";
 const LOCK_THRESHOLD_PX = 70;
 
@@ -126,6 +126,7 @@ const buildRecorderOptions = ({ mimeType, isVideoMode }) => {
 const MessageBar = () => {
   const emojiRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
   const videoPreviewRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
@@ -140,7 +141,7 @@ const MessageBar = () => {
   const pointerStartYRef = useRef(0);
   const isLockedRecordingRef = useRef(false);
   const sourceMediaStreamRef = useRef(null);
-  const processedVideoCleanupRef = useRef(null)
+  const processedVideoCleanupRef = useRef(null);
 
   const socket = useSocket();
 
@@ -183,6 +184,38 @@ const MessageBar = () => {
   const showLockGuide =
     !hasTypedMessage && isRecording && !recordedBlob && !isSendingRecordedMedia;
 
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "0px";
+
+    const nextHeight = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY =
+      textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+  };
+
+  const focusTextarea = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    requestAnimationFrame(() => {
+      try {
+        textarea.focus({ preventScroll: true });
+      } catch {
+        textarea.focus();
+      }
+
+      const length = textarea.value.length;
+      try {
+        textarea.setSelectionRange(length, length);
+      } catch {
+        // ignore
+      }
+    });
+  };
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (emojiRef.current && !emojiRef.current.contains(event.target)) {
@@ -203,6 +236,10 @@ const MessageBar = () => {
   }, []);
 
   useEffect(() => {
+    adjustTextareaHeight();
+  }, [message, isMediaDraftActive]);
+
+  useEffect(() => {
     return () => {
       stopRecordingTimer();
 
@@ -220,8 +257,8 @@ const MessageBar = () => {
       mediaStreamRef.current = null;
       revokeRecordedPreviewUrl();
       if (processedVideoCleanupRef.current) {
-          processedVideoCleanupRef.current()
-          processedVideoCleanupRef.current = null
+        processedVideoCleanupRef.current();
+        processedVideoCleanupRef.current = null;
       }
       releaseManagedOwner(RECORDER_MEDIA_OWNER);
     };
@@ -315,112 +352,115 @@ const MessageBar = () => {
 
   const handleAddEmoji = (emoji) => {
     setMessage((prev) => prev + emoji.emoji);
+    requestAnimationFrame(() => {
+      adjustTextareaHeight();
+      focusTextarea();
+    });
   };
 
   const stopStreamSafely = (stream) => {
-  if (!stream) return;
+    if (!stream) return;
 
-  stream.getTracks().forEach((track) => {
-    try {
-      track.stop();
-    } catch (error) {
-      console.log("track.stop error", error);
-    }
-  });
-};
-
-const createCanvasProcessedVideoStream = async ({
-  sourceStream,
-  shouldMirror,
-  fps = 30,
-}) => {
-  const sourceVideo = document.createElement("video");
-  sourceVideo.autoplay = true;
-  sourceVideo.muted = true;
-  sourceVideo.playsInline = true;
-  sourceVideo.srcObject = sourceStream;
-
-  await sourceVideo.play();
-
-  const sourceTrack = sourceStream.getVideoTracks()[0];
-  const settings = sourceTrack?.getSettings?.() || {};
-
-  const width = settings.width || 720;
-  const height = settings.height || 720;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-
-  const ctx = canvas.getContext("2d", { alpha: false });
-
-  let rafId = 0;
-  let stopped = false;
-
-  const drawFrame = () => {
-    if (stopped || !ctx) return;
-
-    if (sourceVideo.readyState >= 2) {
-      ctx.clearRect(0, 0, width, height);
-
-      if (shouldMirror) {
-        ctx.save();
-        ctx.translate(width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(sourceVideo, 0, 0, width, height);
-        ctx.restore();
-      } else {
-        ctx.drawImage(sourceVideo, 0, 0, width, height);
-      }
-    }
-
-    rafId = requestAnimationFrame(drawFrame);
-  };
-
-  drawFrame();
-
-  const canvasStream = canvas.captureStream(fps);
-  const processedStream = new MediaStream();
-
-  const canvasVideoTrack = canvasStream.getVideoTracks()[0];
-  if (canvasVideoTrack) {
-    processedStream.addTrack(canvasVideoTrack);
-  }
-
-  sourceStream.getAudioTracks().forEach((track) => {
-    processedStream.addTrack(track);
-  });
-
-  const cleanup = () => {
-    stopped = true;
-
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-    }
-
-    try {
-      sourceVideo.pause();
-    } catch (error) {
-      console.log("sourceVideo.pause error", error);
-    }
-
-    sourceVideo.srcObject = null;
-
-    canvasStream.getVideoTracks().forEach((track) => {
+    stream.getTracks().forEach((track) => {
       try {
         track.stop();
       } catch (error) {
-        console.log("canvas video track.stop error", error);
+        console.log("track.stop error", error);
       }
     });
   };
 
-  return {
-    stream: processedStream,
-    cleanup,
+  const createCanvasProcessedVideoStream = async ({
+    sourceStream,
+    shouldMirror,
+    fps = 30,
+  }) => {
+    const sourceVideo = document.createElement("video");
+    sourceVideo.autoplay = true;
+    sourceVideo.muted = true;
+    sourceVideo.playsInline = true;
+    sourceVideo.srcObject = sourceStream;
+
+    await sourceVideo.play();
+
+    const sourceTrack = sourceStream.getVideoTracks()[0];
+    const settings = sourceTrack?.getSettings?.() || {};
+
+    const width = settings.width || 720;
+    const height = settings.height || 720;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+
+    let rafId = 0;
+    let stopped = false;
+
+    const drawFrame = () => {
+      if (stopped || !ctx) return;
+
+      if (sourceVideo.readyState >= 2) {
+        ctx.clearRect(0, 0, width, height);
+
+        if (shouldMirror) {
+          ctx.save();
+          ctx.translate(width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(sourceVideo, 0, 0, width, height);
+          ctx.restore();
+        } else {
+          ctx.drawImage(sourceVideo, 0, 0, width, height);
+        }
+      }
+
+      rafId = requestAnimationFrame(drawFrame);
+    };
+
+    drawFrame();
+
+    const canvasStream = canvas.captureStream(fps);
+    const processedStream = new MediaStream();
+
+    const canvasVideoTrack = canvasStream.getVideoTracks()[0];
+    if (canvasVideoTrack) {
+      processedStream.addTrack(canvasVideoTrack);
+    }
+
+    sourceStream.getAudioTracks().forEach((track) => {
+      processedStream.addTrack(track);
+    });
+
+    const cleanup = () => {
+      stopped = true;
+
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      try {
+        sourceVideo.pause();
+      } catch (error) {
+        console.log("sourceVideo.pause error", error);
+      }
+
+      sourceVideo.srcObject = null;
+
+      canvasStream.getVideoTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (error) {
+          console.log("canvas video track.stop error", error);
+        }
+      });
+    };
+
+    return {
+      stream: processedStream,
+      cleanup,
+    };
   };
-};
-  
 
   const togglePreferredRecordingMode = async () => {
     if (isMediaDraftActive || isSendingRecordedMedia) return;
@@ -614,6 +654,11 @@ const createCanvasProcessedVideoStream = async ({
     });
 
     setMessage("");
+
+    requestAnimationFrame(() => {
+      adjustTextareaHeight();
+      focusTextarea();
+    });
   };
 
   const handleKeyDown = (e) => {
@@ -646,6 +691,7 @@ const createCanvasProcessedVideoStream = async ({
       });
 
       event.target.value = "";
+      focusTextarea();
     } catch (error) {
       console.log({ error });
       toast.error("Не удалось отправить файл");
@@ -759,7 +805,6 @@ const createCanvasProcessedVideoStream = async ({
 
       mediaStreamRef.current = recordingStream;
 
-
       const recorderOptions = buildRecorderOptions({
         mimeType: selectedMimeType,
         isVideoMode,
@@ -793,12 +838,12 @@ const createCanvasProcessedVideoStream = async ({
         }
 
         if (processedVideoCleanupRef.current) {
-          processedVideoCleanupRef.current()
-          processedVideoCleanupRef.current = null
+          processedVideoCleanupRef.current();
+          processedVideoCleanupRef.current = null;
         }
 
         mediaStreamRef.current = null;
-        sourceMediaStreamRef.current = null
+        sourceMediaStreamRef.current = null;
         mediaRecorderRef.current = null;
         discardOnStopRef.current = false;
         autoSendOnStopRef.current = false;
@@ -876,14 +921,6 @@ const createCanvasProcessedVideoStream = async ({
       recordingTimerRef.current = setInterval(() => {
         recordingSecondsRef.current += 1;
         setRecordingSeconds(recordingSecondsRef.current);
-
-        if (
-          mode === "video-note" &&
-          recordingSecondsRef.current >= MAX_VIDEO_NOTE_SECONDS
-        ) {
-          autoSendOnStopRef.current = false;
-          stopRecording();
-        }
       }, 1000);
     } catch (error) {
       console.log({ error });
@@ -894,12 +931,12 @@ const createCanvasProcessedVideoStream = async ({
       }
 
       if (processedVideoCleanupRef.current) {
-          processedVideoCleanupRef.current()
-          processedVideoCleanupRef.current = null
+        processedVideoCleanupRef.current();
+        processedVideoCleanupRef.current = null;
       }
 
       mediaStreamRef.current = null;
-      sourceMediaStreamRef.current = null
+      sourceMediaStreamRef.current = null;
       mediaRecorderRef.current = null;
       setIsRecording(false);
       setRecordingMode(null);
@@ -928,6 +965,7 @@ const createCanvasProcessedVideoStream = async ({
 
       if (success) {
         discardRecordedMedia();
+        focusTextarea();
       }
     } catch (error) {
       console.log({ error });
@@ -1088,7 +1126,9 @@ const createCanvasProcessedVideoStream = async ({
             muted
             playsInline
             className="h-full w-full object-cover"
-            style={{transform: videoFacingMode === "user" ? "scaleX(-1)" : "none"}}
+            style={{
+              transform: videoFacingMode === "user" ? "scaleX(-1)" : "none",
+            }}
           />
         </div>
 
@@ -1297,20 +1337,26 @@ const createCanvasProcessedVideoStream = async ({
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-2 md:gap-4">
-        <div className="flex-1 flex bg-card border border-border px-2 rounded-xl items-center pr-3 md:pr-5">
+      <div className="flex items-end justify-center gap-2 md:gap-4">
+        <div className="flex-1 flex bg-card border border-border px-2 rounded-xl items-end pr-3 md:pr-5">
           <textarea
-            className="flex-1 md:p-5 p-2 bg-transparent rounded-xl focus:border-none focus:outline-none resize-none overflow-hidden disabled:opacity-60"
+            ref={textareaRef}
+            className="flex-1 md:p-5 p-2 bg-transparent rounded-xl focus:border-none focus:outline-none resize-none disabled:opacity-60"
             placeholder={
               isMediaDraftActive
                 ? "Сначала отправь или удали записанное сообщение"
                 : "Введите сообщение"
             }
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              adjustTextareaHeight();
+            }}
             onKeyDown={handleKeyDown}
             rows={1}
             disabled={isMediaDraftActive}
+            enterKeyHint="send"
+            style={{ maxHeight: `${MAX_TEXTAREA_HEIGHT}px` }}
           />
 
           <button
@@ -1373,6 +1419,8 @@ const createCanvasProcessedVideoStream = async ({
           <button
             className="bg-primary text-primary-foreground rounded-xl flex items-center justify-center md:p-5 p-3 focus:border-none hover:bg-primary/90 focus:bg-primary/80 focus:outline-none focus:text-foreground duration-200 transition-all disabled:opacity-50"
             onClick={handleSendMessage}
+            onPointerDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
             type="button"
             disabled={!message.trim() || isMediaDraftActive}
             title="Отправить сообщение"
@@ -1435,3 +1483,4 @@ const createCanvasProcessedVideoStream = async ({
 };
 
 export default MessageBar;
+
