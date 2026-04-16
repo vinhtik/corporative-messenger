@@ -374,6 +374,33 @@ export const deleteProfilePhoto = async (request, response) => {
   }
 };
 
+export const savePushToken = async (request, response) => {
+  try {
+    const { token } = request.body;
+
+    if (!token) {
+      return response.status(400).send("Push token is required");
+    }
+
+    const user = await User.findByIdAndUpdate(
+      request.userId,
+      { $addToSet: { pushTokens: token } },
+      { new: true }
+    );
+
+    if (!user) {
+      return response.status(404).send("User not found");
+    }
+
+    return response.status(200).json({ success: true });
+  } catch (err) {
+    console.log({ err });
+    return response.status(500).send("Internal Server Error");
+  }
+};
+
+
+
 export const logout = async (request, response) => {
   try {
     response.cookie("jwt", "", { 

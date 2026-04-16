@@ -1,10 +1,12 @@
 import { Server as SocketIOServer } from "socket.io";
 import Message from "./models/MessagesModel.js";
 import Channel from "./models/ChannelModel.js";
+import User from "./models/UserModel.js"
 import {
   getChannelMemberIds,
   isChannelMember,
 } from "./utils/channelPermissions.js";
+import admin from "./lib/firebase-admin.js";
 
 const CALL_EVENTS = {
   JOIN_CALL_ROOM: "join-call-room",
@@ -97,23 +99,85 @@ ioInstance = io;
 
 
   const sendMessage = async (message) => {
-    const senderSocketId = getUserSocketId(message.sender);
-    const recipientSocketId = getUserSocketId(message.recipient);
+  const senderSocketId = getUserSocketId(message.sender);
+  const recipientSocketId = getUserSocketId(message.recipient);
 
-    const createdMessage = await Message.create(message);
+  const createdMessage = await Message.create(message);
 
-    const messageData = await Message.findById(createdMessage._id)
-      .populate("sender", "id email firstName lastName image color")
-      .populate("recipient", "id email firstName lastName image color");
+  const messageData = await Message.findById(createdMessage._id)
+    .populate("sender", "id email firstName lastName image color")
+    .populate("recipient", "id email firstName lastName image color");
 
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("recieveMessage", messageData);
+  const recipientUser = await User.findById(message.recipient).select("pushTokens");
+
+  if (recipientUser?.pushTokens?.length) {
+    const title =
+      [messageData.sender?.firstName, messageData.sender?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || messageData.sender?.email || "Новое сообщение";
+
+    const body =
+      message.messageType === "text"
+        ? message.content || "Новое сообщение"
+        : message.messageType === "audio"
+        ? "Голосовое сообщение"
+        : message.messageType === "video-note"
+        ? "Видеосообщение"
+        : "Файл";
+
+    try {
+      const pushResponse = await admin.messaging().sendEachForMulticast({
+        tokens: recipientUser.pushTokens,
+        notification: {
+          title,
+          body,
+        },
+        data: {
+          type: "message",
+          chatType: "contact",
+          senderId: String(messageData.sender?._id || ""),
+          recipientId: String(messageData.recipient?._id || ""),
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "messages",
+          },
+        },
+      });
+
+      if (pushResponse.failureCount > 0) {
+        const invalidTokens = [];
+
+        pushResponse.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            invalidTokens.push(recipientUser.pushTokens[idx]);
+            console.log("FCM token send error:", resp.error);
+          }
+        });
+
+        if (invalidTokens.length) {
+          await User.findByIdAndUpdate(message.recipient, {
+            $pull: { pushTokens: { $in: invalidTokens } },
+          });
+        }
+      }
+    } catch (error) {
+      console.log("FCM send error", error);
     }
+  }
 
-    if (senderSocketId) {
-      io.to(senderSocketId).emit("recieveMessage", messageData);
-    }
-  };
+  if (recipientSocketId) {
+    io.to(recipientSocketId).emit("recieveMessage", messageData);
+  }
+
+  if (senderSocketId) {
+    io.to(senderSocketId).emit("recieveMessage", messageData);
+  }
+};
+
+
 
   const sendChannelMessage = async (message) => {
   const { channelId, sender, content, messageType, fileUrl, mimeType, duration } =
@@ -158,12 +222,82 @@ ioInstance = io;
 
   const finalData = { ...messageData._doc, channelId: updatedChannel._id };
 
+  const memberIds = getChannelMemberIds(updatedChannel).filter(
+    (userId) => String(userId) !== String(sender)
+  );
+
+  const usersToNotify = await User.find({
+    _id: { $in: memberIds },
+  }).select("_id pushTokens");
+
+  const senderName =
+    [messageData.sender?.firstName, messageData.sender?.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim() || messageData.sender?.email || "Новое сообщение";
+
+  const body =
+    messageType === "text"
+      ? content || "Новое сообщение"
+      : messageType === "audio"
+      ? "Голосовое сообщение"
+      : messageType === "video-note"
+      ? "Видеосообщение"
+      : "Файл";
+
+  for (const user of usersToNotify) {
+    if (!user?.pushTokens?.length) continue;
+
+    try {
+      const pushResponse = await admin.messaging().sendEachForMulticast({
+        tokens: user.pushTokens,
+        notification: {
+          title: updatedChannel.name || senderName,
+          body,
+        },
+        data: {
+          type: "message",
+          chatType: "channel",
+          channelId: String(updatedChannel._id),
+          senderId: String(messageData.sender?._id || ""),
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "messages",
+          },
+        },
+      });
+
+      if (pushResponse.failureCount > 0) {
+        const invalidTokens = [];
+
+        pushResponse.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            invalidTokens.push(user.pushTokens[idx]);
+            console.log("FCM channel token send error:", resp.error);
+          }
+        });
+
+        if (invalidTokens.length) {
+          await User.findByIdAndUpdate(user._id, {
+            $pull: { pushTokens: { $in: invalidTokens } },
+          });
+        }
+      }
+    } catch (error) {
+      console.log("FCM channel send error", error);
+    }
+  }
+
   emitToManyUsers(
     getChannelMemberIds(updatedChannel),
     "recieve-channel-message",
     finalData
   );
 };
+
+
 
 
 

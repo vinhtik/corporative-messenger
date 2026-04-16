@@ -11,6 +11,8 @@ import { useAppStore } from "./store/index.js";
 import { apiClient } from "./lib/api-client.js";
 import { GET_USER_INFO } from "./utils/constants.js";
 import AndroidBackHandler from "./components/android-back-handler.jsx";
+import { initPushNotifications } from "./lib/push-notifications.js";
+import PushActionRouterBridge from "./components/push-action-router-bridge.jsx";
 
 const PrivateRoute = ({ children }) => {
   const { userInfo } = useAppStore();
@@ -39,6 +41,8 @@ const App = () => {
 
         if (response.status === 200 && response.data.id) {
           setUserInfo(response.data);
+          initPushNotifications().catch((err) =>
+          console.log("initPushNotifications error", err))
         } else {
           setUserInfo(undefined);
         }
@@ -63,6 +67,7 @@ const App = () => {
 
   return (
     <BrowserRouter>
+    <PushActionRouterBridge />
     <AndroidBackHandler />
       <Routes>
         <Route

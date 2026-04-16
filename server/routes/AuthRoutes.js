@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getUserInfo, login, signup, updateProfile, addProfileImage, removeProfileImage, logout, getMyProfilePhotos, addProfilePhoto, setAvatarPhoto, deleteProfilePhoto } from "../conrollers/AuthController.js";
+import { getUserInfo, login, signup, updateProfile, addProfileImage, removeProfileImage, logout, getMyProfilePhotos, addProfilePhoto, setAvatarPhoto, deleteProfilePhoto, savePushToken } from "../conrollers/AuthController.js";
 import { verifyToken } from "../middlewares/AuthMiddleware.js";
 import multer from "multer";
 
@@ -19,5 +19,6 @@ authRoutes.post("/profile-photos", verifyToken, upload.single("profile-photo"), 
 authRoutes.patch("/profile-photos/:photoId/avatar", verifyToken, setAvatarPhoto);
 authRoutes.delete("/profile-photos/:photoId", verifyToken, deleteProfilePhoto);
 authRoutes.post("/logout", logout);
+authRoutes.post("/push-token" , verifyToken, savePushToken)
 
 export default authRoutes;

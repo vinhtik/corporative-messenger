@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "806586759382",
+    "project_id": "ale-messenger",
+    "storage_bucket": "ale-messenger.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:806586759382:android:50eafb81213c9a632ff177",
+        "android_client_info": {
+          "package_name": "com.sixseven.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBs7-MHXvAhjwEqPzDl3ZURxdmCx4uq1eE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
