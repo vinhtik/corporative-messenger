@@ -1360,7 +1360,7 @@ const MessageBar = () => {
           />
 
           <button
-            className="text-muted-foreground focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all disabled:opacity-50"
+            className="text-muted-foreground focus:border-none mb-2 focus:outline-none focus:text-foreground duration-200 transition-all disabled:opacity-50"
             onClick={handleAttachmentClick}
             type="button"
             disabled={isMediaDraftActive || isSendingRecordedMedia}
@@ -1377,7 +1377,7 @@ const MessageBar = () => {
           />
 
           <button
-            className="text-muted-foreground focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all ml-2 disabled:opacity-50"
+            className="text-muted-foreground focus:border-none mb-2 focus:outline-none focus:text-foreground duration-200 transition-all ml-2 disabled:opacity-50"
             onClick={togglePreferredRecordingMode}
             type="button"
             disabled={isMediaDraftActive || isSendingRecordedMedia}
@@ -1392,7 +1392,7 @@ const MessageBar = () => {
 
           <div className="relative flex">
             <button
-              className="text-muted-foreground focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all ml-2 disabled:opacity-50"
+              className="text-muted-foreground mb-2 focus:border-none focus:outline-none focus:text-foreground duration-200 transition-all ml-2 disabled:opacity-50"
               onClick={() => setEmojiPickerOpen((prev) => !prev)}
               type="button"
               disabled={isMediaDraftActive}
