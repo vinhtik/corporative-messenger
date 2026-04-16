@@ -1,11 +1,17 @@
 package com.sixseven.app;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -22,9 +28,37 @@ public class MainActivity extends BridgeActivity {
     private PermissionRequest pendingPermissionRequest;
     private String[] pendingGrantedResources = new String[0];
 
+    private ValueCallback<Uri[]> filePathCallback;
+    private ActivityResultLauncher<Intent> fileChooserLauncher;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        fileChooserLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (filePathCallback == null) {
+                        return;
+                    }
+
+                    Uri[] results = null;
+
+                    try {
+                        if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                            results = WebChromeClient.FileChooserParams.parseResult(
+                                    result.getResultCode(),
+                                    result.getData()
+                            );
+                        }
+                    } catch (Exception error) {
+                        error.printStackTrace();
+                    }
+
+                    filePathCallback.onReceiveValue(results);
+                    filePathCallback = null;
+                }
+        );
 
         if (bridge != null && bridge.getWebView() != null) {
             bridge.getWebView().setWebChromeClient(new WebChromeClient() {
@@ -39,6 +73,39 @@ public class MainActivity extends BridgeActivity {
                         pendingPermissionRequest = null;
                         pendingGrantedResources = new String[0];
                     }
+                }
+
+                @Override
+                public boolean onShowFileChooser(
+                        WebView webView,
+                        ValueCallback<Uri[]> filePathCallbackParam,
+                        FileChooserParams fileChooserParams
+                ) {
+                    if (filePathCallback != null) {
+                        filePathCallback.onReceiveValue(null);
+                    }
+
+                    filePathCallback = filePathCallbackParam;
+
+                    Intent intent;
+                    try {
+                        intent = fileChooserParams.createIntent();
+                    } catch (Exception e) {
+                        filePathCallback = null;
+                        return false;
+                    }
+
+                    try {
+                        fileChooserLauncher.launch(intent);
+                    } catch (Exception e) {
+                        if (filePathCallback != null) {
+                            filePathCallback.onReceiveValue(null);
+                            filePathCallback = null;
+                        }
+                        return false;
+                    }
+
+                    return true;
                 }
             });
         }

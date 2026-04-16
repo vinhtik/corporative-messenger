@@ -143,6 +143,7 @@ ioInstance = io;
           priority: "high",
           notification: {
             channelId: "messages",
+            tag: `dm:${String(messageData.sender?._id || "")}`,
           },
         },
       });
@@ -265,6 +266,7 @@ ioInstance = io;
           priority: "high",
           notification: {
             channelId: "messages",
+            tag: `channel:${String(updatedChannel._id)}`
           },
         },
       });
