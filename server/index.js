@@ -26,7 +26,10 @@ const allowedOrigins = [
   "http://127.0.0.1:4173",
   "https://corp-messenger.ddns.net",
   "http://178.205.150.242",
-  "https://178.205.150.242"
+  "https://178.205.150.242",
+  "http://localhost",
+  "https://localhost",
+  "capacitor://localhost"
 ].filter(Boolean);
 
 app.use(

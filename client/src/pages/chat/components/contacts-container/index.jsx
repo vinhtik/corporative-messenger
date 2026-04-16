@@ -1,12 +1,14 @@
-import Logo from "@/assets/logo.svg";
+import LogoDark from "@/assets/darklogo.png";
+import LogoLight from "@/assets/lightlogo.png";
 import ProfileInfo from "./components/profile-info";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { apiClient } from "@/lib/api-client";
 import { GET_DM_CONTACTS_ROUTES, GET_USER_CHANNELS_ROUTE } from "@/utils/constants";
 import { useAppStore } from "@/store";
 import ContactList from "@/components/contact-list.jsx";
 import CreateChannel from "./components/create-channel";
 import FriendsManager from "./components/friends-manager";
+import { getSystemThemeMode } from "@/lib/theme-utils";
 
 const ContactsContainer = () => {
   const {
@@ -41,13 +43,21 @@ const ContactsContainer = () => {
     getChannels();
   }, [setChannels, setDirectMessagesContacts]);
 
+  const themeMode = useAppStore((state) => state.themeMode)
+
+  const resolvedTheme = useMemo(() => {
+    return themeMode === "system" ? getSystemThemeMode() : themeMode
+  }, [themeMode])
+
+  const currentLogo = resolvedTheme === "dark" ? LogoDark : LogoLight
+
   return (
     <div
       className="relative md:w-[35vw] lg:w-[30vw]
      xl:w-[20vw] bg-sidebar border-r-2 border-sidebar-border w-full"
     >
-      <div className="pt-3">
-        <img src={Logo} alt="Logo" className="h-[4rem] pl-10" />
+      <div className="pt-3 pb-3">
+        <img src={currentLogo} alt="Logo" className="h-[7rem] md:h-[9rem] pl-10" />
       </div>
 
       <div className="my-5">

@@ -44,8 +44,9 @@ export const signup = async (request, response) => {
     response.cookie("jwt", createToken(email, user.id), {
       maxAge,
       secure: true,
-      sameSite: "Lax",
+      sameSite: "None",
       httpOnly: true,
+      path: "/",
     });
 
     return response.status(201).json({
@@ -79,8 +80,9 @@ export const login = async (request, response) => {
     response.cookie("jwt", createToken(email, user.id), {
       maxAge,
       secure: true,
-      sameSite: "Lax",
+      sameSite: "None",
       httpOnly: true,
+      path: "/",
     });
 
     return response.status(200).json({
@@ -377,8 +379,10 @@ export const logout = async (request, response) => {
     response.cookie("jwt", "", { 
         maxAge: 1,
         secure: true,
-        sameSite: "Lax",
-        httpOnly: true, });
+        sameSite: "None",
+        httpOnly: true,
+        path: "/",
+    });
     return response.status(200).send("Logout successfull");
   } catch (err) {
     console.log({ err });
