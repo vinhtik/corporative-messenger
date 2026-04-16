@@ -24,6 +24,21 @@ const getUserSocketId = (userId) => {
   return userSocketMap.get(String(userId));
 };
 
+const allowedOrigins = [
+  process.env.ORIGIN,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
+  "https://corp-messenger.ddns.net",
+  "http://178.205.150.242",
+  "https://178.205.150.242",
+  "http://localhost",
+  "https://localhost",
+  "capacitor://localhost",
+].filter(Boolean);
+
+
 export const emitToUser = (userId, eventName, payload) => {
   if (!ioInstance) return;
 
@@ -60,15 +75,26 @@ const disconnect = (socket) => {
 };
 
 const setupSocket = (server) => {
-  const io = new SocketIOServer(server, {
-    cors: {
-      origin: process.env.ORIGIN,
-      methods: ["GET", "POST"],
-      credentials: true,
-    },
+const io = new SocketIOServer(server, {
+cors: {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+if (allowedOrigins.includes(origin)) {
+  return callback(null, true);
+}
+
+return callback(new Error(`Socket.IO CORS blocked for origin: ${origin}`));
+},
+methods: ["GET", "POST"],
+  credentials: true,
+  },
   });
 
-  ioInstance = io;
+ioInstance = io;
+
 
   const sendMessage = async (message) => {
     const senderSocketId = getUserSocketId(message.sender);

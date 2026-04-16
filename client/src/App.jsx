@@ -10,6 +10,7 @@ import IncomingCallModal from "./components/incoming-call-modal.jsx";
 import { useAppStore } from "./store/index.js";
 import { apiClient } from "./lib/api-client.js";
 import { GET_USER_INFO } from "./utils/constants.js";
+import AndroidBackHandler from "./components/android-back-handler.jsx";
 
 const PrivateRoute = ({ children }) => {
   const { userInfo } = useAppStore();
@@ -62,6 +63,7 @@ const App = () => {
 
   return (
     <BrowserRouter>
+    <AndroidBackHandler />
       <Routes>
         <Route
           path="/auth"

@@ -50,45 +50,17 @@ const getMessagePreview = (message) => {
 
 const showMessageToast = ({ sender, message, isChannel = false, channelName = "" }) => {
   const title = getDisplayName(sender);
-  const imageSrc = getImageSrc(sender?.image);
   const preview = getMessagePreview(message);
 
-  toast.custom(
-    () => (
-      <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-[#1f212b] px-4 py-3 text-white shadow-lg w-[320px] max-w-[calc(100vw-2rem)]">
-        <Avatar className="h-10 w-10 rounded-full overflow-hidden shrink-0">
-          {imageSrc ? (
-            <AvatarImage
-              src={imageSrc}
-              alt={title}
-              className="object-cover w-full h-full bg-black"
-            />
-          ) : (
-          <AvatarFallback
-             className={`uppercase h-10 w-10 text-sm flex items-center justify-center rounded-full ${getColor(
-                sender?.color ?? 0
-              )}`}
-            >
-            {title.charAt(0)}
-            </AvatarFallback>
-          )}
-          </Avatar>
-
-        <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm truncate">
-            {isChannel ? `${title} · ${channelName || "Группа"}` : title}
-          </div>
-          <div className="text-xs text-neutral-300 break-words line-clamp-2 mt-1">
-            {preview}
-          </div>
-        </div>
-      </div>
-    ),
-    {
-      duration: 4000,
-    }
-  );
+  toast(title, {
+    description: isChannel
+      ? `${channelName || "Группа"} · ${preview}`
+      : preview,
+    duration: 4000,
+  });
 };
+
+
 
 export const SocketProvider = ({ children }) => {
   const { userInfo } = useAppStore();
