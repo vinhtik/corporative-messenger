@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import Chat from "./pages/chat/index.jsx";
@@ -31,6 +31,7 @@ const AuthRoute = ({ children }) => {
 const App = () => {
   const { userInfo, setUserInfo } = useAppStore();
   const [loading, setLoading] = useState(true);
+  const pushInitializedRef = useRef(false);
 
   useEffect(() => {
     const getUserData = async () => {
@@ -41,8 +42,6 @@ const App = () => {
 
         if (response.status === 200 && response.data.id) {
           setUserInfo(response.data);
-          initPushNotifications().catch((err) =>
-          console.log("initPushNotifications error", err))
         } else {
           setUserInfo(undefined);
         }
@@ -61,14 +60,32 @@ const App = () => {
     }
   }, [userInfo, setUserInfo]);
 
+  useEffect(() => {
+    if (!userInfo?.id) {
+      pushInitializedRef.current = false;
+      return;
+    }
+
+    if (pushInitializedRef.current) {
+      return;
+    }
+
+    pushInitializedRef.current = true;
+
+    initPushNotifications().catch((err) => {
+      console.log("initPushNotifications error", err);
+    });
+  }, [userInfo?.id]);
+
   if (loading) {
     return <div>Loading...</div>;
   }
 
   return (
     <BrowserRouter>
-    <PushActionRouterBridge />
-    <AndroidBackHandler />
+      <PushActionRouterBridge />
+      <AndroidBackHandler />
+
       <Routes>
         <Route
           path="/auth"
@@ -115,3 +132,4 @@ const App = () => {
 };
 
 export default App;
+

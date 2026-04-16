@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import { apiClient } from "@/lib/api-client";
 
 export const PUSH_OPEN_CHAT_EVENT = "push:open-chat";
@@ -18,16 +19,31 @@ export const initPushNotifications = async () => {
     sound: "default",
   });
 
-  let permStatus = await PushNotifications.checkPermissions();
+  await LocalNotifications.createChannel({
+    id: "messages",
+    name: "Messages",
+    description: "Уведомления о новых сообщениях",
+    importance: 5,
+    visibility: 1,
+    sound: "default",
+  });
 
-  if (permStatus.receive === "prompt") {
-    permStatus = await PushNotifications.requestPermissions();
+  let pushPermStatus = await PushNotifications.checkPermissions();
+  if (pushPermStatus.receive === "prompt") {
+    pushPermStatus = await PushNotifications.requestPermissions();
   }
 
-  if (permStatus.receive !== "granted") {
+  if (pushPermStatus.receive !== "granted") {
     console.log("Push permission denied");
     return;
   }
+
+  let localPermStatus = await LocalNotifications.checkPermissions();
+  if (localPermStatus.display === "prompt") {
+    localPermStatus = await LocalNotifications.requestPermissions();
+  }
+
+  await PushNotifications.removeAllListeners();
 
   await PushNotifications.addListener("registration", async (token) => {
     console.log("Push token:", token.value);
@@ -47,14 +63,45 @@ export const initPushNotifications = async () => {
     console.log("push registration error", error);
   });
 
-  await PushNotifications.addListener("pushNotificationReceived", (notification) => {
+  await PushNotifications.addListener("pushNotificationReceived", async (notification) => {
     console.log("push received", notification);
+
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Date.now(),
+            title: notification.title || "Новое сообщение",
+            body: notification.body || "",
+            channelId: "messages",
+            extra: notification.data || {},
+          },
+        ],
+      });
+    } catch (error) {
+      console.log("local notification schedule error", error);
+    }
   });
 
   await PushNotifications.addListener("pushNotificationActionPerformed", (event) => {
     const payload = event?.notification?.data || {};
 
     console.log("push action", event);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.__pendingPushOpenChat = payload;
+    window.dispatchEvent(
+      new CustomEvent(PUSH_OPEN_CHAT_EVENT, {
+        detail: payload,
+      })
+    );
+  });
+
+  await LocalNotifications.addListener("localNotificationActionPerformed", (event) => {
+    const payload = event?.notification?.extra || {};
 
     if (typeof window === "undefined") {
       return;
